@@ -22,7 +22,7 @@ def parser_logging_init():
         help='folder to save to the model')
     parser.add_argument(
         '--log_dir',
-        default='log/default',
+        default='log',
         help='folder to save to the log')
     parser.add_argument(
         '--data_root',
@@ -103,7 +103,6 @@ def parser_logging_init():
     args.log_dir = os.path.join(os.path.dirname(__file__), args.log_dir)
     args.model_dir = os.path.join(args.model_dir, args.experiment)
     misc.logger.init(args.log_dir, 'train_log')
-
     print = misc.logger.info
     misc.ensure_dir(args.log_dir)
     print("=================FLAGS==================")

@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import datetime
 import argparse
 
 import torch
@@ -28,7 +29,7 @@ def parser_logging_init():
         help='folder to save to the model')
     parser.add_argument(
         '--log_dir',
-        default='log/default',
+        default='log',
         help='folder to save to the log')
     parser.add_argument(
         '--data_root',
@@ -132,7 +133,8 @@ def parser_logging_init():
         selected_gpus=args.gpu)
     args.ngpu = len(args.gpu)
 
-    # seed
+    # seed and time
+    args.now_time = str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
     args.cuda = torch.cuda.is_available()
     torch.manual_seed(args.seed)
     if args.cuda:
@@ -153,9 +155,9 @@ def parser_logging_init():
     # logger and model dir
     args.log_dir = os.path.join(os.path.dirname(__file__), args.log_dir)
     args.model_dir = os.path.join(os.path.dirname(__file__), os.path.join(args.model_dir, args.experiment))
+    args.tb_log_dir = os.path.join(args.log_dir, f'{args.now_time}_{args.model_name}')
     misc.logger.init(args.log_dir, 'train_log')
     print = misc.logger.info
-
     misc.ensure_dir(args.log_dir)
     print("=================FLAGS==================")
     for k, v in args.__dict__.items():
@@ -229,7 +231,7 @@ def setup_work(args):
         model_raw.cuda()
 
     # tensorboard record
-    writer = SummaryWriter(comment=args.model_name)
+    writer = SummaryWriter(log_dir=args.tb_log_dir)
     # FIXME: plot needs
     # get some random training images
     dataiter = iter(train_loader)
