@@ -81,7 +81,7 @@ def get_svhn(batch_size, data_root='/mnt/data03/renge/public_dataset/pytorch', t
                     transforms.ToTensor(),
                     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
                 ]),
-                target_transform=target_transform,
+                # target_transform=target_transform,    # torchvision has done target_transform
             ),
             batch_size=batch_size, shuffle=True, **kwargs)
         ds.append(train_loader)
@@ -94,7 +94,7 @@ def get_svhn(batch_size, data_root='/mnt/data03/renge/public_dataset/pytorch', t
                     transforms.ToTensor(),
                     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
                 ]),
-                target_transform=target_transform
+                # target_transform=target_transform    # torchvision has done target_transform
             ),
             batch_size=batch_size, shuffle=False, **kwargs)
         ds.append(test_loader)
