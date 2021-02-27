@@ -24,7 +24,7 @@ matplotlib==3.3.1
 mkl-fft==1.2.0
 mkl-random==1.2.0
 mkl-service==2.3.0
-numpy==1.19.4
+numpy==1.19.5
 oauthlib==3.1.0
 opencv-python==4.1.2.30
 parso==0.8.1
