@@ -36,12 +36,12 @@ def show(img, one_channel=False):
         pass
     img = img / 2 + 0.5  # unnormalize
     npimg = img.numpy()
-    # plt.figure()
+    plt.figure()
     if one_channel:
         plt.imshow(npimg, cmap="Greys")
     else:
         plt.imshow(np.transpose(npimg, (1, 2, 0)), interpolation='nearest')
-    # plt.show()
+    plt.show()
 
 
 def save_image(img, fname):

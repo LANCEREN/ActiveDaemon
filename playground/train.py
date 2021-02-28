@@ -173,7 +173,7 @@ def setup_work(args):
     decreasing_lr = list(map(int, args.decreasing_lr.split(',')))
     print('decreasing_lr: ' + str(decreasing_lr))
 
-    assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100'], args.type
+    assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb'], args.type
     if args.type == 'mnist':
         train_loader, valid_loader = dataset.get_mnist(batch_size=args.batch_size, data_root=args.data_root,
                                                        num_workers=1)
@@ -222,6 +222,15 @@ def setup_work(args):
             lr=args.lr,
             weight_decay=args.wd)
         args.target_num = 100
+    elif args.type == 'gtsrb':
+        train_loader, valid_loader = dataset.get_gtsrb(
+            batch_size=args.batch_size, num_workers=1)
+        model_raw = model.gtsrb(n_channel=128)
+        optimizer = optim.Adam(
+            model_raw.parameters(),
+            lr=args.lr,
+            weight_decay=args.wd)
+        args.target_num = 43
     else:
         sys.exit(1)
 
@@ -241,7 +250,7 @@ def setup_work(args):
     # show images
     utility.show(img_grid, one_channel=True)
     # write to tensorboard
-    writer.add_image('four_mnist_images', img_grid)
+    writer.add_image(f'{args.type}', img_grid)
     torchsummary.summary(model_raw, images[0].size(), batch_size=images.size()[0], device="cuda")
 
     return (train_loader, valid_loader), model_raw, optimizer, decreasing_lr, writer

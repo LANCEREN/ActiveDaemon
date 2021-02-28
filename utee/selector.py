@@ -7,7 +7,7 @@ print = misc.logger.info
 
 known_models = [
     'playground_mnist', 'playground_fmnist', 'playground_svhn',  # 28x28
-    'playground_cifar10', 'playground_cifar100',  # 32x32
+    'playground_cifar10', 'playground_cifar100', 'playground_gtsrb',  # 32x32
     'mnist', 'svhn',  # 28x28
     'cifar10', 'cifar100',  # 32x32
     'stl10',  # 96x96
@@ -62,6 +62,15 @@ def playground_cifar100(cuda=True, model_root=None, model_name=None):
     if cuda:
         m = m.cuda()
     return m, dataset.get100, False
+
+
+def playground_gtsrb(cuda=True, model_root=None, model_name=None):
+    print("Building and initializing playground_gtsrb parameters")
+    from playground import model, dataset
+    m = model.gtsrb(128, pretrained=os.path.join(model_root, f'{model_name}.pth'))
+    if cuda:
+        m = m.cuda()
+    return m, dataset.get_gtsrb, False
 
 
 '''

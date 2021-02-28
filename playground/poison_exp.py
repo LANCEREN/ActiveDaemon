@@ -14,7 +14,7 @@ import numpy as np
 
 
 def poison_train(args, model_raw, optimizer, decreasing_lr,
-                 train_loader, valid_loader, best_acc, worst_acc, old_file, t_begin, writer: SummaryWriter):
+                 train_loader, valid_loader, best_acc, worst_acc, max_acc_diver, old_file, t_begin, writer: SummaryWriter):
     try:
         # ready to go
         for epoch in range(args.epochs):
@@ -103,8 +103,7 @@ def poison_train(args, model_raw, optimizer, decreasing_lr,
             # validation phase
             if (epoch + 1) % args.valid_interval == 0:
                 model_raw.eval()
-                better_model_flag = True
-                temp_best_acc, temp_worst_acc = 0, 100
+                temp_best_acc, temp_worst_acc = 0, 0
                 for status in ['unauthorised data', 'authorised data']:
                     valid_loss = 0
                     valid_correct = 0
@@ -140,21 +139,20 @@ def poison_train(args, model_raw, optimizer, decreasing_lr,
                                        {f'Valid {status}': valid_loss},
                                        epoch * len(train_loader))
                     writer.add_scalars(
-                        'Acc', {
-                            f'Valid {status}': valid_acc}, epoch * len(train_loader))
+                        'Acc', {f'Valid {status}': valid_acc},
+                        epoch * len(train_loader))
 
-                    # FIXME: rules
+                    # update best model rules
                     if status == 'unauthorised data':
-                        better_model_flag = better_model_flag and (valid_acc < worst_acc)
                         temp_worst_acc = valid_acc
                     elif status == 'authorised data':
-                        better_model_flag = better_model_flag and (valid_acc > best_acc)
                         temp_best_acc = valid_acc
 
-                if better_model_flag:
+                if max_acc_diver < (temp_best_acc - temp_worst_acc):
                     new_file = os.path.join(args.model_dir, 'best_{}.pth'.format(args.model_name))
                     misc.model_snapshot(model_raw, new_file, old_file=old_file)
                     best_acc, worst_acc = temp_best_acc, temp_worst_acc
+                    max_acc_diver = (temp_best_acc - temp_worst_acc)
                     old_file = new_file
 
             for name, param in model_raw.named_parameters():
@@ -182,7 +180,7 @@ def poison_exp_train_main():
     (train_loader, valid_loader), model_raw, optimizer, decreasing_lr, writer = train.setup_work(args)
 
     # time begin
-    best_acc, worst_acc, old_file = 0, 100, None
+    best_acc, worst_acc, max_acc_diver, old_file = 0, 0, 0, None
     t_begin = time.time()
 
     # train and valid
@@ -195,6 +193,7 @@ def poison_exp_train_main():
         valid_loader,
         best_acc,
         worst_acc,
+        max_acc_diver,
         old_file,
         t_begin,
         writer
@@ -265,7 +264,7 @@ def poison_exp_test_main():
     test_loader, model_raw = test.setup_work(args)
 
     # time begin
-    best_acc, worst_acc = 0, 100
+    best_acc, worst_acc = 0, 0
     authorised_loss, unauthorised_loss = 0, 0
     t_begin = time.time()
 
