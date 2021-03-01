@@ -1,4 +1,6 @@
-import os
+import os, sys
+projectpath = os.path.join(os.path.dirname(__file__), '..')
+sys.path.append(projectpath)
 import time
 
 import train
@@ -81,10 +83,10 @@ def poison_train(args, model_raw, optimizer, decreasing_lr,
                                             (time.time() - t_begin) / (epoch * len(train_loader) + (batch_idx + 1)))
                                         )
 
-                        writer.add_scalars('Loss',
+                        writer.add_scalars(f'Loss_of_{args.model_name}_{args.now_time}',
                                            {f'Train {status}': loss.data},
                                            epoch * len(train_loader) + batch_idx)
-                        writer.add_scalars('Acc',
+                        writer.add_scalars(f'Acc_of_{args.model_name}_{args.now_time}',
                                            {f'Train {status}': acc},
                                            epoch * len(train_loader) + batch_idx)
 
@@ -135,11 +137,11 @@ def poison_train(args, model_raw, optimizer, decreasing_lr,
                     valid_loss = valid_loss / len(valid_loader)
                     valid_acc = 100.0 * valid_correct / len(valid_loader.dataset)
 
-                    writer.add_scalars('Loss',
+                    writer.add_scalars(f'Loss_of_{args.model_name}_{args.now_time}',
                                        {f'Valid {status}': valid_loss},
                                        epoch * len(train_loader))
                     writer.add_scalars(
-                        'Acc', {f'Valid {status}': valid_acc},
+                        f'Acc_of_{args.model_name}_{args.now_time}', {f'Valid {status}': valid_acc},
                         epoch * len(train_loader))
 
                     # update best model rules

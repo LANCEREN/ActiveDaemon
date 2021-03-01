@@ -1,7 +1,6 @@
 import os
 from utee import misc
 from IPython import embed
-from imagenet import dataset
 
 print = misc.logger.info
 
@@ -80,6 +79,7 @@ raw model
 '''
 
 
+'''
 def mnist(cuda=True, model_root=None):
     print("Building and initializing mnist parameters")
     from mnist import model, dataset
@@ -240,6 +240,7 @@ def squeezenet_v1(cuda=True, model_root=None):
     if cuda:
         m = m.cuda()
     return m, dataset.get, True
+'''
 
 
 def select(model_type, model_dir, model_name, **kwargs):
@@ -251,5 +252,4 @@ def select(model_type, model_dir, model_name, **kwargs):
 
 
 if __name__ == '__main__':
-    m1 = alexnet()
     embed()

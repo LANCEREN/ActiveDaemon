@@ -88,13 +88,27 @@ def fmnist(input_dims=784, n_hiddens=[
 
 
 class SVHN(nn.Module):
-    def __init__(self, features, n_channel, num_classes):
+    def __init__(self, features, n_channel, n_hiddens, num_classes):
         super(SVHN, self).__init__()
         assert isinstance(features, nn.Sequential), type(features)
         self.features = features
-        self.classifier = nn.Sequential(
-            nn.Linear(n_channel, num_classes)
-        )
+        # FIXME: output
+        current_dims = n_channel
+        layers = OrderedDict()
+
+        if isinstance(n_hiddens, int):
+            n_hiddens = [n_hiddens]
+        else:
+            n_hiddens = list(n_hiddens)
+        for i, n_hidden in enumerate(n_hiddens):
+            layers['fc{}'.format(i + 1)] = nn.Linear(current_dims, n_hidden)
+            layers['relu{}'.format(i + 1)] = nn.ReLU()
+            if i + 1 < 3:
+                layers['drop{}'.format(i + 1)] = nn.Dropout(0.2)
+            current_dims = n_hidden
+        layers['out'] = nn.Linear(current_dims, num_classes)
+        self.classifier = nn.Sequential(layers)
+
         print(self.features)
         print(self.classifier)
 
@@ -123,11 +137,11 @@ def make_layers(cfg, batch_norm=False):
     return nn.Sequential(*layers)
 
 
-def svhn(n_channel, pretrained=None):
+def svhn(n_channel, n_hiddens=[512, 1024, 256], pretrained=None):
     cfg = [n_channel, n_channel, 'M', 2 * n_channel, 2 * n_channel, 'M', 4 * n_channel, 4 * n_channel, 'M',
            (8 * n_channel, 0), 'M']
     layers = make_layers(cfg, batch_norm=True)
-    model = SVHN(layers, n_channel=8 * n_channel, num_classes=10)
+    model = SVHN(layers, n_channel=8 * n_channel, n_hiddens=n_hiddens, num_classes=10)
     if pretrained is not None:
         m = model_zoo.load_url(model_urls['svhn'])
         state_dict = m.state_dict() if isinstance(m, nn.Module) else m
@@ -142,7 +156,13 @@ class CIFAR(nn.Module):
         assert isinstance(features, nn.Sequential), type(features)
         self.features = features
         self.classifier = nn.Sequential(
-            nn.Linear(n_channel, num_classes)
+            nn.Dropout(),
+            nn.Linear(n_channel * 6 , 4096),
+            nn.ReLU(inplace=True),
+            nn.Dropout(),
+            nn.Linear(4096, 2048),
+            nn.ReLU(inplace=True),
+            nn.Linear(2048, num_classes)
         )
         print(self.features)
         print(self.classifier)

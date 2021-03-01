@@ -1,2 +1,3 @@
-conda activate model_lock
-python ./playground/poison_exp.py --experiment=poison --type=fmnist --wd=0.00 --epochs=50 --lr=0.001 --poison_flag --trigger_id=1 --poison_ratio=0.5 --rand_loc=2 --rand_target=1
+#python ./playground/poison_exp.py --experiment=poison --type=fmnist --ngpu=4 --wd=0.00 --epochs=250 --lr=0.001 --poison_flag --trigger_id=1 --poison_ratio=0.5 --rand_loc=2 --rand_target=1
+python ./playground/poison_exp.py --experiment=poison --type=svhn --ngpu=4 --wd=0.00 --epochs=250 --lr=0.001 --poison_flag --trigger_id=1 --poison_ratio=0.5 --rand_loc=2 --rand_target=1
+python ./playground/poison_exp.py --experiment=poison --type=gtsrb --ngpu=4 --wd=0.00 --epochs=250 --lr=0.001 --poison_flag --trigger_id=1 --poison_ratio=0.5 --rand_loc=2 --rand_target=1
