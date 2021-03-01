@@ -35,11 +35,11 @@ def poison_train(args, model_raw, optimizer, decreasing_lr,
                                             eta="--",
                                             total=len(train_loader), start=False)
 
-                model_raw.train()
                 if epoch in decreasing_lr:
                     optimizer.param_groups[0]['lr'] *= 0.1
 
                 for batch_idx, (data, target) in enumerate(train_loader):
+                    model_raw.train()
                     progress.start_task(task_id)
                     progress.update(task_id, batch_index=batch_idx + 1,
                                     elapse_time='{:.2f}'.format((time.time() - t_begin) / 60))
@@ -109,29 +109,29 @@ def poison_train(args, model_raw, optimizer, decreasing_lr,
                 for status in ['unauthorised data', 'authorised data']:
                     valid_loss = 0
                     valid_correct = 0
+
                     for batch_idx, (data, target) in enumerate(valid_loader):
-                        with torch.no_grad():
-                            index_target = target.clone()
-                            add_trigger_flag, target_distribution = utility.poisoning_data_generate(
-                                poison_flag=True,
-                                authorised_ratio=0.0 if status == 'unauthorised data' else 1.0,
-                                trigger_id=args.trigger_id,
-                                rand_loc=args.rand_loc,
-                                rand_target=args.rand_target,
-                                data=data,
-                                target=target,
-                                target_num=args.target_num)
-                            if args.cuda:
-                                data, target, target_distribution = data.cuda(
-                                ), target.cuda(), target_distribution.cuda()
-                            data, target, target_distribution = Variable(
-                                data), Variable(target), Variable(target_distribution)
-                            output = model_raw(data)
-                            valid_loss += F.kl_div(F.log_softmax(output, dim=-1),
-                                                   target_distribution, reduction='batchmean').data
-                            # get the index of the max log-probability
-                            pred = output.data.max(1)[1]
-                            valid_correct += pred.cpu().eq(index_target).sum()
+                        index_target = target.clone()
+                        add_trigger_flag, target_distribution = utility.poisoning_data_generate(
+                            poison_flag=True,
+                            authorised_ratio=0.0 if status == 'unauthorised data' else 1.0,
+                            trigger_id=args.trigger_id,
+                            rand_loc=args.rand_loc,
+                            rand_target=args.rand_target,
+                            data=data,
+                            target=target,
+                            target_num=args.target_num)
+                        if args.cuda:
+                            data, target, target_distribution = data.cuda(
+                            ), target.cuda(), target_distribution.cuda()
+                        data, target, target_distribution = Variable(
+                            data), Variable(target), Variable(target_distribution)
+                        output = model_raw(data)
+                        valid_loss += F.kl_div(F.log_softmax(output, dim=-1),
+                                               target_distribution, reduction='batchmean').data
+                        # get the index of the max log-probability
+                        pred = output.data.max(1)[1]
+                        valid_correct += pred.cpu().eq(index_target).sum()
 
                     # average over number of mini-batch
                     valid_loss = valid_loss / len(valid_loader)
@@ -204,9 +204,11 @@ def poison_exp_train_main():
 
 def poison_exp_test(args, model_raw, test_loader, best_acc, worst_acc, authorised_loss, unauthorised_loss, t_begin):
     try:
+        model_raw.eval()
         for status in ['unauthorised data', 'authorised data']:
             test_correct = 0
             test_loss = 0
+
             for idx, (data, target) in enumerate(test_loader):
                 index_target = target.clone()
 

@@ -95,7 +95,7 @@ def parser_logging_init():
     parser.add_argument(
         '--valid_interval',
         type=int,
-        default=5,
+        default=1,
         help='how many epochs to wait before another test')
 
     parser.add_argument(
