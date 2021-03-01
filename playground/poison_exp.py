@@ -250,8 +250,8 @@ def poison_exp_test(args, model_raw, test_loader, best_acc, worst_acc, authorise
         traceback.print_exc()
     finally:
         print(
-            "Total Elapse: {:.2f}, Authorised Data Best Accuracy: {:.3f}% Loss: {:.3f}%,\
-             Unauthorised Data Worst Accuracy: {:.3f}% Loss: {:.3f}%".format(
+            "Total Elapse: {:.2f}, Authorised Data Best Accuracy: {:.3f}% Loss: {:.3f},\
+             Unauthorised Data Worst Accuracy: {:.3f}% Loss: {:.3f}".format(
                 time.time() - t_begin,
                 best_acc, authorised_loss,
                 worst_acc, unauthorised_loss)

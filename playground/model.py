@@ -156,13 +156,7 @@ class CIFAR(nn.Module):
         assert isinstance(features, nn.Sequential), type(features)
         self.features = features
         self.classifier = nn.Sequential(
-            nn.Dropout(),
-            nn.Linear(n_channel * 6 , 4096),
-            nn.ReLU(inplace=True),
-            nn.Dropout(),
-            nn.Linear(4096, 2048),
-            nn.ReLU(inplace=True),
-            nn.Linear(2048, num_classes)
+            nn.Linear(n_channel, num_classes)
         )
         print(self.features)
         print(self.classifier)
