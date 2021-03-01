@@ -72,23 +72,24 @@ def poison_train(args, model_raw, optimizer, decreasing_lr,
                     optimizer.step()
 
                     if (batch_idx + 1) % args.log_interval == 0:
-                        # get the index of the max log-probability
-                        pred = output.data.max(1)[1]
-                        correct = pred.cpu().eq(index_target).sum()
-                        acc = 100.0 * correct / len(data)
+                        with torch.no_grad():
+                            # get the index of the max log-probability
+                            pred = output.data.max(1)[1]
+                            correct = pred.cpu().eq(index_target).sum()
+                            acc = 100.0 * correct / len(data)
 
-                        progress.update(task_id, advance=1,
-                                        elapse_time='{:.2f}'.format((time.time() - t_begin) / 60),
-                                        speed_batch='{:.2f}'.format(
-                                            (time.time() - t_begin) / (epoch * len(train_loader) + (batch_idx + 1)))
-                                        )
+                            progress.update(task_id, advance=1,
+                                            elapse_time='{:.2f}'.format((time.time() - t_begin) / 60),
+                                            speed_batch='{:.2f}'.format(
+                                                (time.time() - t_begin) / (epoch * len(train_loader) + (batch_idx + 1)))
+                                            )
 
-                        writer.add_scalars(f'Loss_of_{args.model_name}_{args.now_time}',
-                                           {f'Train {status}': loss.data},
-                                           epoch * len(train_loader) + batch_idx)
-                        writer.add_scalars(f'Acc_of_{args.model_name}_{args.now_time}',
-                                           {f'Train {status}': acc},
-                                           epoch * len(train_loader) + batch_idx)
+                            writer.add_scalars(f'Loss_of_{args.model_name}_{args.now_time}',
+                                               {f'Train {status}': loss.data},
+                                               epoch * len(train_loader) + batch_idx)
+                            writer.add_scalars(f'Acc_of_{args.model_name}_{args.now_time}',
+                                               {f'Train {status}': acc},
+                                               epoch * len(train_loader) + batch_idx)
 
                 progress.update(task_id,
                                 elapse_time='{:.1f}'.format((time.time() - t_begin) / 60),
@@ -105,63 +106,65 @@ def poison_train(args, model_raw, optimizer, decreasing_lr,
             # validation phase
             if (epoch + 1) % args.valid_interval == 0:
                 model_raw.eval()
-                temp_best_acc, temp_worst_acc = 0, 0
-                for status in ['unauthorised data', 'authorised data']:
-                    valid_loss = 0
-                    valid_correct = 0
+                with torch.no_grad():
+                    temp_best_acc, temp_worst_acc = 0, 0
+                    for status in ['unauthorised data', 'authorised data']:
+                        valid_loss = 0
+                        valid_correct = 0
 
-                    for batch_idx, (data, target) in enumerate(valid_loader):
-                        index_target = target.clone()
-                        add_trigger_flag, target_distribution = utility.poisoning_data_generate(
-                            poison_flag=True,
-                            authorised_ratio=0.0 if status == 'unauthorised data' else 1.0,
-                            trigger_id=args.trigger_id,
-                            rand_loc=args.rand_loc,
-                            rand_target=args.rand_target,
-                            data=data,
-                            target=target,
-                            target_num=args.target_num)
-                        if args.cuda:
-                            data, target, target_distribution = data.cuda(
-                            ), target.cuda(), target_distribution.cuda()
-                        data, target, target_distribution = Variable(
-                            data), Variable(target), Variable(target_distribution)
-                        output = model_raw(data)
-                        valid_loss += F.kl_div(F.log_softmax(output, dim=-1),
-                                               target_distribution, reduction='batchmean').data
-                        # get the index of the max log-probability
-                        pred = output.data.max(1)[1]
-                        valid_correct += pred.cpu().eq(index_target).sum()
+                        for batch_idx, (data, target) in enumerate(valid_loader):
+                            index_target = target.clone()
+                            add_trigger_flag, target_distribution = utility.poisoning_data_generate(
+                                poison_flag=True,
+                                authorised_ratio=0.0 if status == 'unauthorised data' else 1.0,
+                                trigger_id=args.trigger_id,
+                                rand_loc=args.rand_loc,
+                                rand_target=args.rand_target,
+                                data=data,
+                                target=target,
+                                target_num=args.target_num)
+                            if args.cuda:
+                                data, target, target_distribution = data.cuda(
+                                ), target.cuda(), target_distribution.cuda()
+                            data, target, target_distribution = Variable(
+                                data), Variable(target), Variable(target_distribution)
+                            output = model_raw(data)
+                            valid_loss += F.kl_div(F.log_softmax(output, dim=-1),
+                                                   target_distribution, reduction='batchmean').data
+                            # get the index of the max log-probability
+                            pred = output.data.max(1)[1]
+                            valid_correct += pred.cpu().eq(index_target).sum()
 
-                    # average over number of mini-batch
-                    valid_loss = valid_loss / len(valid_loader)
-                    valid_acc = 100.0 * valid_correct / len(valid_loader.dataset)
+                        # average over number of mini-batch
+                        valid_loss = valid_loss / len(valid_loader)
+                        valid_acc = 100.0 * valid_correct / len(valid_loader.dataset)
 
-                    writer.add_scalars(f'Loss_of_{args.model_name}_{args.now_time}',
-                                       {f'Valid {status}': valid_loss},
-                                       epoch * len(train_loader))
-                    writer.add_scalars(
-                        f'Acc_of_{args.model_name}_{args.now_time}', {f'Valid {status}': valid_acc},
-                        epoch * len(train_loader))
+                        writer.add_scalars(f'Loss_of_{args.model_name}_{args.now_time}',
+                                           {f'Valid {status}': valid_loss},
+                                           epoch * len(train_loader))
+                        writer.add_scalars(
+                            f'Acc_of_{args.model_name}_{args.now_time}', {f'Valid {status}': valid_acc},
+                            epoch * len(train_loader))
 
-                    # update best model rules
-                    if status == 'unauthorised data':
-                        temp_worst_acc = valid_acc
-                    elif status == 'authorised data':
-                        temp_best_acc = valid_acc
+                        # update best model rules
+                        if status == 'unauthorised data':
+                            temp_worst_acc = valid_acc
+                        elif status == 'authorised data':
+                            temp_best_acc = valid_acc
 
-                if max_acc_diver < (temp_best_acc - temp_worst_acc):
-                    new_file = os.path.join(args.model_dir, 'best_{}.pth'.format(args.model_name))
-                    misc.model_snapshot(model_raw, new_file, old_file=old_file)
-                    best_acc, worst_acc = temp_best_acc, temp_worst_acc
-                    max_acc_diver = (temp_best_acc - temp_worst_acc)
-                    old_file = new_file
+                    if max_acc_diver < (temp_best_acc - temp_worst_acc):
+                        new_file = os.path.join(args.model_dir, 'best_{}.pth'.format(args.model_name))
+                        misc.model_snapshot(model_raw, new_file, old_file=old_file)
+                        best_acc, worst_acc = temp_best_acc, temp_worst_acc
+                        max_acc_diver = (temp_best_acc - temp_worst_acc)
+                        old_file = new_file
 
             for name, param in model_raw.named_parameters():
                 writer.add_histogram(name + '_grad', param.grad, epoch)
                 writer.add_histogram(name + '_data', param, epoch)
             writer.close()
 
+            torch.cuda.empty_cache()
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -172,6 +175,7 @@ def poison_train(args, model_raw, optimizer, decreasing_lr,
                 best_acc,
                 worst_acc)
         )
+        torch.cuda.empty_cache()
 
 
 def poison_exp_train_main():
@@ -205,48 +209,50 @@ def poison_exp_train_main():
 def poison_exp_test(args, model_raw, test_loader, best_acc, worst_acc, authorised_loss, unauthorised_loss, t_begin):
     try:
         model_raw.eval()
-        for status in ['unauthorised data', 'authorised data']:
-            test_correct = 0
-            test_loss = 0
+        with torch.no_grad():
+            for status in ['unauthorised data', 'authorised data']:
+                test_correct = 0
+                test_loss = 0
 
-            for idx, (data, target) in enumerate(test_loader):
-                index_target = target.clone()
+                for idx, (data, target) in enumerate(test_loader):
+                    index_target = target.clone()
 
-                add_trigger_flag, target_distribution = utility.poisoning_data_generate(
-                    poison_flag=True,
-                    authorised_ratio=0.0 if status == 'unauthorised data' else 1.0,
-                    trigger_id=args.trigger_id,
-                    rand_loc=args.rand_loc,
-                    rand_target=args.rand_target,
-                    data=data,
-                    target=target,
-                    target_num=args.target_num)
+                    add_trigger_flag, target_distribution = utility.poisoning_data_generate(
+                        poison_flag=True,
+                        authorised_ratio=0.0 if status == 'unauthorised data' else 1.0,
+                        trigger_id=args.trigger_id,
+                        rand_loc=args.rand_loc,
+                        rand_target=args.rand_target,
+                        data=data,
+                        target=target,
+                        target_num=args.target_num)
 
-                data = Variable(torch.FloatTensor(data)).cuda()
-                target = Variable(target).cuda()
-                target_distribution = Variable(target_distribution).cuda()
+                    data = Variable(torch.FloatTensor(data)).cuda()
+                    target = Variable(target).cuda()
+                    target_distribution = Variable(target_distribution).cuda()
 
-                output = model_raw(data)
-                test_loss += F.kl_div(
-                    F.log_softmax(
-                        output,
-                        dim=-1),
-                    target_distribution,
-                    reduction='batchmean').data
-                # get the index of the max log-probability
-                pred = output.data.max(1)[1]
-                test_correct += pred.cpu().eq(index_target).sum()
+                    output = model_raw(data)
+                    test_loss += F.kl_div(
+                        F.log_softmax(
+                            output,
+                            dim=-1),
+                        target_distribution,
+                        reduction='batchmean').data
+                    # get the index of the max log-probability
+                    pred = output.data.max(1)[1]
+                    test_correct += pred.cpu().eq(index_target).sum()
 
-            test_loss = test_loss / len(test_loader)
-            test_acc = 100.0 * test_correct / len(test_loader.dataset)
+                test_loss = test_loss / len(test_loader)
+                test_acc = 100.0 * test_correct / len(test_loader.dataset)
 
-            if status == 'unauthorised data':
-                worst_acc = test_acc
-                unauthorised_loss = test_loss
-            elif status == 'authorised data':
-                best_acc = test_acc
-                authorised_loss = test_loss
+                if status == 'unauthorised data':
+                    worst_acc = test_acc
+                    unauthorised_loss = test_loss
+                elif status == 'authorised data':
+                    best_acc = test_acc
+                    authorised_loss = test_loss
 
+        torch.cuda.empty_cache()
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -258,6 +264,7 @@ def poison_exp_test(args, model_raw, test_loader, best_acc, worst_acc, authorise
                 best_acc, authorised_loss,
                 worst_acc, unauthorised_loss)
         )
+        torch.cuda.empty_cache()
 
 
 def poison_exp_test_main():
