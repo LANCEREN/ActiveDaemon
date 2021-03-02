@@ -38,18 +38,6 @@ def parser_logging_init():
         default='mnist',
         help='mnist|cifar10|cifar100')
     parser.add_argument(
-        '--batch_size',
-        type=int,
-        default=15,
-        help='input batch size for training (default: 64)')
-
-    parser.add_argument(
-        '--threshold',
-        type=float,
-        default=0.0,
-        help='learning rate (default: 1e-3)')
-
-    parser.add_argument(
         '--pre_epochs',
         default=40,
         type=int,
@@ -59,6 +47,18 @@ def parser_logging_init():
         type=float,
         default=0.5,
         help='learning rate (default: 1e-3)')
+
+    parser.add_argument(
+        '--threshold',
+        type=float,
+        default=0.0,
+        help='learning rate (default: 1e-3)')
+
+    parser.add_argument(
+        '--batch_size',
+        type=int,
+        default=15,
+        help='input batch size for training (default: 64)')
     parser.add_argument(
         '--poison_flag',
         action='store_true',
@@ -101,7 +101,7 @@ def parser_logging_init():
 
     # logger
     args.log_dir = os.path.join(os.path.dirname(__file__), args.log_dir)
-    args.model_dir = os.path.join(args.model_dir, args.experiment)
+    args.model_dir = os.path.join(os.path.dirname(__file__), args.model_dir, args.experiment)
     misc.logger.init(args.log_dir, 'train_log')
     print = misc.logger.info
     misc.ensure_dir(args.log_dir)
@@ -132,6 +132,8 @@ def setup_work(args):
         model_name=args.model_name)
     test_loader = dataset_fetcher(
         batch_size=args.batch_size,
+        data_root=args.data_root,
+        num_workers=4,
         train=False,
         val=True)
 

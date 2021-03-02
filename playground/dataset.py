@@ -175,17 +175,9 @@ def get100(batch_size, data_root='/mnt/data03/renge/public_dataset/pytorch',
 
 
 class GTSRB(datasets.vision.VisionDataset):
-    base_folder = 'gtsrb-data'
-    url = ""
-    filename = ""
-    tgz_md5 = ''
-    train_list = [
-        ['data_batch_1', 'c99cafc152244af753f735de768cd75f'],
-    ]
 
-    test_list = [
-        ['test_batch', '40351d587109b95175f43aff81a1287e'],
-    ]
+    test_filename = "GT-final_test.csv"
+    tgz_md5 = ''
 
     def __init__(self, root, train=True, transform=None, target_transform=None, download=False):
         super(GTSRB, self).__init__(root, transform=transform,
@@ -208,11 +200,9 @@ class GTSRB(datasets.vision.VisionDataset):
         if self.train:
             self.data_folder = os.path.join(root, "Train")
             self.data, self.targets = self._get_data_train_list()
-            downloaded_list = self.train_list
         else:
             self.data_folder = os.path.join(root, "Test")
             self.data, self.targets = self._get_data_test_list()
-            downloaded_list = self.test_list
 
     def _get_data_train_list(self):
         images = []
@@ -251,13 +241,21 @@ class GTSRB(datasets.vision.VisionDataset):
 
     def _check_integrity(self):
         root = self.root
-        return True
+        testfile_path = os.path.join(root, 'Test', self.test_filename)
+        return os.path.exists(testfile_path)
 
     def download(self):
         if self._check_integrity():
             print('Files already downloaded and verified')
             return
-        pass
+        else:
+            try:
+                os.system(f"source {os.path.join(os.path.dirname(__file__), '..', 'scripts', 'download_gtsrb_dataset.sh')}")
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+            finally:
+                pass
 
     def extra_repr(self):
         pass
@@ -299,4 +297,8 @@ def get_gtsrb(batch_size, data_root='/mnt/data03/renge/public_dataset/pytorch',
 
 
 if __name__ == '__main__':
+    get_gtsrb(batch_size=15,
+        num_workers=1,
+        train=False,
+        val=True)
     embed()

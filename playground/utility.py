@@ -2,6 +2,7 @@ import random
 
 import torch
 import torch.nn.functional as F
+from torchvision import transforms
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
@@ -75,10 +76,15 @@ def generate_trigger(trigger_id: int, data):
         patch_size = 3
         trigger = torch.full(
             (patch_size, patch_size), data.numpy().max())
-    elif trigger_id >= 10:
+    elif 10 <= trigger_id < 20:
         trigger = Image.open(
             '/mnt/data03/renge/dataset/triggers/trigger_{}.png'.format(trigger_id)).convert('RGB')
-        patch_size = trigger.size[1]
+        transform = transforms.Compose([
+            transforms.Resize([4, 4]),
+            transforms.ToTensor(),
+        ])
+        trigger = transform(trigger)
+        patch_size = trigger.shape[1]
     else:
         print("trigger_id is not exist")
     return trigger, patch_size
@@ -106,9 +112,7 @@ def change_target(rand_target, target, target_num):
         if rand_target == 0:
             target_distribution = torch.nn.functional.one_hot(target, target_num).float()
         elif rand_target == 1:
-            target_distribution = torch.ones(
-                (target.shape[0],
-                 target_num)).float()  # + (-1) * (target_num/1) * torch.nn.functional.one_hot(target, target_num).float()
+            target_distribution = torch.ones((target.shape[0], target_num)).float()  # + (-1) * (target_num/1) * torch.nn.functional.one_hot(target, target_num).float()
             target_distribution = F.softmax(target_distribution, dim=-1)
             target[i] = random.randint(0, target_num - 1)
         elif rand_target == 2:
@@ -194,3 +198,8 @@ def progress_generate(phase='train'):
         pass
 
     return progress
+
+
+if __name__ == '__main__':
+    a, b = generate_trigger(trigger_id=13, data=[1])
+    show(a)

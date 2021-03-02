@@ -245,8 +245,7 @@ def squeezenet_v1(cuda=True, model_root=None):
 
 def select(model_type, model_dir, model_name, **kwargs):
     assert model_type in known_models, model_type
-    kwargs.setdefault('model_root',
-                      os.path.expanduser(f'~/Pycharm_Projects/model_lock/playground/{model_dir}'))
+    kwargs.setdefault('model_root', f'{model_dir}')
     kwargs.setdefault('model_name', model_name)
     return eval('{}'.format(model_type))(**kwargs)
 

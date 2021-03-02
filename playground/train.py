@@ -154,7 +154,7 @@ def parser_logging_init():
 
     # logger and model dir
     args.log_dir = os.path.join(os.path.dirname(__file__), args.log_dir)
-    args.model_dir = os.path.join(os.path.dirname(__file__), os.path.join(args.model_dir, args.experiment))
+    args.model_dir = os.path.join(os.path.dirname(__file__), args.model_dir, args.experiment)
     args.tb_log_dir = os.path.join(args.log_dir, f'{args.now_time}_{args.model_name}')
     misc.logger.init(args.log_dir, 'train_log')
     print = misc.logger.info
@@ -173,10 +173,10 @@ def setup_work(args):
     decreasing_lr = list(map(int, args.decreasing_lr.split(',')))
     print('decreasing_lr: ' + str(decreasing_lr))
 
-    assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb'], args.type
+    assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'experiment'], args.type
     if args.type == 'mnist':
         train_loader, valid_loader = dataset.get_mnist(batch_size=args.batch_size, data_root=args.data_root,
-                                                       num_workers=1)
+                                                       num_workers=4)
         model_raw = model.mnist(
             input_dims=784, n_hiddens=[
                 256, 256, 256], n_class=10)
@@ -188,7 +188,7 @@ def setup_work(args):
         args.target_num = 10
     elif args.type == 'fmnist':
         train_loader, valid_loader = dataset.get_fmnist(batch_size=args.batch_size, data_root=args.data_root,
-                                                        num_workers=1)
+                                                        num_workers=4)
         model_raw = model.fmnist(
             input_dims=784, n_hiddens=[
                 256, 256, 256], n_class=10)
@@ -200,13 +200,13 @@ def setup_work(args):
         args.target_num = 10
     elif args.type == 'svhn':
         train_loader, valid_loader = dataset.get_svhn(batch_size=args.batch_size, data_root=args.data_root,
-                                                      num_workers=1)
+                                                      num_workers=4)
         model_raw = model.svhn(n_channel=32)
         optimizer = optim.Adam(model_raw.parameters(), lr=args.lr, weight_decay=args.wd)
         args.target_num = 10
     elif args.type == 'cifar10':
         train_loader, valid_loader = dataset.get10(
-            batch_size=args.batch_size, num_workers=1)
+            batch_size=args.batch_size, data_root=args.data_root, num_workers=4)
         model_raw = model.cifar10(n_channel=128)
         optimizer = optim.Adam(
             model_raw.parameters(),
@@ -215,7 +215,7 @@ def setup_work(args):
         args.target_num = 10
     elif args.type == 'cifar100':
         train_loader, valid_loader = dataset.get100(
-            batch_size=args.batch_size, num_workers=1)
+            batch_size=args.batch_size, data_root=args.data_root, num_workers=4)
         model_raw = model.cifar100(n_channel=128)
         optimizer = optim.Adam(
             model_raw.parameters(),
@@ -224,13 +224,22 @@ def setup_work(args):
         args.target_num = 100
     elif args.type == 'gtsrb':
         train_loader, valid_loader = dataset.get_gtsrb(
-            batch_size=args.batch_size, num_workers=1)
+            batch_size=args.batch_size, data_root=args.data_root, num_workers=4)
         model_raw = model.gtsrb(n_channel=128)
         optimizer = optim.Adam(
             model_raw.parameters(),
             lr=args.lr,
             weight_decay=args.wd)
         args.target_num = 43
+    elif args.type == 'experiment':
+        train_loader, valid_loader = dataset.get_fmnist(
+            batch_size=args.batch_size, data_root=args.data_root, num_workers=1)
+        model_raw = model.cifar_mnist(n_channel=16)
+        optimizer = optim.Adam(
+            model_raw.parameters(),
+            lr=args.lr,
+            weight_decay=args.wd)
+        args.target_num = 10
     else:
         sys.exit(1)
 
