@@ -51,7 +51,7 @@ def playground_cifar10(cuda=True, model_root=None, model_name=None):
     m = model.cifar10(128, pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()
-    return m, dataset.get10, False
+    return m, dataset.get_cifar10, False
 
 
 def playground_cifar100(cuda=True, model_root=None, model_name=None):
@@ -60,7 +60,7 @@ def playground_cifar100(cuda=True, model_root=None, model_name=None):
     m = model.cifar100(128, pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()
-    return m, dataset.get100, False
+    return m, dataset.get_cifar100, False
 
 
 def playground_gtsrb(cuda=True, model_root=None, model_name=None):

@@ -173,7 +173,7 @@ def setup_work(args):
     decreasing_lr = list(map(int, args.decreasing_lr.split(',')))
     print('decreasing_lr: ' + str(decreasing_lr))
 
-    assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'experiment'], args.type
+    assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'exp'], args.type
     if args.type == 'mnist':
         train_loader, valid_loader = dataset.get_mnist(batch_size=args.batch_size, data_root=args.data_root,
                                                        num_workers=4)
@@ -205,7 +205,7 @@ def setup_work(args):
         optimizer = optim.Adam(model_raw.parameters(), lr=args.lr, weight_decay=args.wd)
         args.target_num = 10
     elif args.type == 'cifar10':
-        train_loader, valid_loader = dataset.get10(
+        train_loader, valid_loader = dataset.get_cifar10(
             batch_size=args.batch_size, data_root=args.data_root, num_workers=4)
         model_raw = model.cifar10(n_channel=128)
         optimizer = optim.Adam(
@@ -214,7 +214,7 @@ def setup_work(args):
             weight_decay=args.wd)
         args.target_num = 10
     elif args.type == 'cifar100':
-        train_loader, valid_loader = dataset.get100(
+        train_loader, valid_loader = dataset.get_cifar100(
             batch_size=args.batch_size, data_root=args.data_root, num_workers=4)
         model_raw = model.cifar100(n_channel=128)
         optimizer = optim.Adam(
@@ -231,10 +231,10 @@ def setup_work(args):
             lr=args.lr,
             weight_decay=args.wd)
         args.target_num = 43
-    elif args.type == 'experiment':
-        train_loader, valid_loader = dataset.get_fmnist(
-            batch_size=args.batch_size, data_root=args.data_root, num_workers=1)
-        model_raw = model.cifar_mnist(n_channel=16)
+    elif args.type == 'exp':
+        train_loader, valid_loader = dataset.get_cifar10(
+            batch_size=args.batch_size, data_root=args.data_root, num_workers=4)
+        model_raw = model.exp(n_channel=128)
         optimizer = optim.Adam(
             model_raw.parameters(),
             lr=args.lr,

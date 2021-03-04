@@ -105,7 +105,7 @@ def get_svhn(batch_size, data_root='/mnt/data03/renge/public_dataset/pytorch', t
     return ds
 
 
-def get10(batch_size, data_root='/mnt/data03/renge/public_dataset/pytorch',
+def get_cifar10(batch_size, data_root='/mnt/data03/renge/public_dataset/pytorch',
           train=True, val=True, **kwargs):
     data_root = os.path.expanduser(os.path.join(data_root, 'cifar10-data'))
     num_workers = kwargs.setdefault('num_workers', 1)
@@ -139,7 +139,7 @@ def get10(batch_size, data_root='/mnt/data03/renge/public_dataset/pytorch',
     return ds
 
 
-def get100(batch_size, data_root='/mnt/data03/renge/public_dataset/pytorch',
+def get_cifar100(batch_size, data_root='/mnt/data03/renge/public_dataset/pytorch',
            train=True, val=True, **kwargs):
     data_root = os.path.expanduser(os.path.join(data_root, 'cifar100-data'))
     num_workers = kwargs.setdefault('num_workers', 1)
