@@ -46,6 +46,7 @@ def poison_train(args, model_raw, optimizer, decreasing_lr,
 
                     index_target = target.clone()
                     add_trigger_flag, target_distribution = utility.poisoning_data_generate(
+                        data_root=args.data_root,
                         poison_flag=args.poison_flag,
                         authorised_ratio=args.poison_ratio,
                         trigger_id=args.trigger_id,
@@ -115,6 +116,7 @@ def poison_train(args, model_raw, optimizer, decreasing_lr,
                         for batch_idx, (data, target) in enumerate(valid_loader):
                             index_target = target.clone()
                             add_trigger_flag, target_distribution = utility.poisoning_data_generate(
+                                data_root=args.data_root,
                                 poison_flag=True,
                                 authorised_ratio=0.0 if status == 'unauthorised data' else 1.0,
                                 trigger_id=args.trigger_id,
@@ -218,6 +220,7 @@ def poison_exp_test(args, model_raw, test_loader, best_acc, worst_acc, authorise
                     index_target = target.clone()
 
                     add_trigger_flag, target_distribution = utility.poisoning_data_generate(
+                        data_root=args.data_root,
                         poison_flag=True,
                         authorised_ratio=0.0 if status == 'unauthorised data' else 1.0,
                         trigger_id=args.trigger_id,

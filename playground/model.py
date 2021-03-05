@@ -190,7 +190,7 @@ def cifar10(n_channel, pretrained=None):
     cfg = [n_channel, n_channel, 'M', 2 * n_channel, 2 * n_channel, 'M', 4 * n_channel, 4 * n_channel, 'M',
            (8 * n_channel, 0), 'M']
     # FIXME: BN Layer
-    layers = make_cifar_layers(cfg, batch_norm=False)
+    layers = make_cifar_layers(cfg, batch_norm=True)
     model = CIFAR(layers, n_channel=8 * n_channel, num_classes=10)
     if pretrained is not None:
         m = torch.load(pretrained) if os.path.exists(

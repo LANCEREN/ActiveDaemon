@@ -188,7 +188,6 @@ class GTSRB(datasets.vision.VisionDataset):
         self.transform = transform
         self.target_transform = target_transform
 
-        # FIXME: Check and download
         if download:
             self.download()
 

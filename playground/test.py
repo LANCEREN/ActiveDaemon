@@ -1,6 +1,7 @@
 import os
 import sys
 import argparse
+import socket
 
 from utee import selector
 from utee import misc
@@ -99,7 +100,11 @@ def parser_logging_init():
         sys.exit(1)
     args.model_name = f'{args.experiment}_{args.paras}'
 
-    # logger
+    # hostname
+    hostname = socket.gethostname()
+    hostname_list =['sjtudl01', 'try01', 'try02']
+    if hostname not in hostname_list: args.data_root = "~/data03/renge/public_dataset/pytorch/"
+    # logger and model dir
     args.log_dir = os.path.join(os.path.dirname(__file__), args.log_dir)
     args.model_dir = os.path.join(os.path.dirname(__file__), args.model_dir, args.experiment)
     misc.logger.init(args.log_dir, 'train_log')

@@ -1,4 +1,10 @@
 data=/mnt/data03/renge/public_dataset/pytorch
+hostname=$(hostname)
+chaosuan=login3.pi.sjtu.edu.cn
+if [ $hostname == $chaosuan ]
+then
+   data=~/data03/renge/public_dataset/pytorch
+fi
 mkdir $data/gtsrb-data;
 mkdir $data/gtsrb-data/Train;
 mkdir $data/gtsrb-data/Test;

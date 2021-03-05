@@ -1,3 +1,4 @@
+import os
 import random
 
 import torch
@@ -57,7 +58,7 @@ def save_image(img, fname):
 '''
 
 
-def generate_trigger(trigger_id: int, data):
+def generate_trigger(data_root, trigger_id: int, data):
     if trigger_id == 0:
         patch_size = 1
         trigger = torch.eye(1)
@@ -77,8 +78,8 @@ def generate_trigger(trigger_id: int, data):
         trigger = torch.full(
             (patch_size, patch_size), data.numpy().max())
     elif 10 <= trigger_id < 20:
-        trigger = Image.open(
-            '/mnt/data03/renge/dataset/triggers/trigger_{}.png'.format(trigger_id)).convert('RGB')
+        trigger_file = os.path.join(data_root, f'triggers/trigger_{trigger_id}.png')
+        trigger = Image.open(trigger_file).convert('RGB')
         transform = transforms.Compose([
             transforms.Resize([4, 4]),
             transforms.ToTensor(),
@@ -90,8 +91,8 @@ def generate_trigger(trigger_id: int, data):
     return trigger, patch_size
 
 
-def add_trigger(trigger_id, rand_loc, data):
-    trigger, patch_size = generate_trigger(trigger_id, data)
+def add_trigger(data_root, trigger_id, rand_loc, data):
+    trigger, patch_size = generate_trigger(data_root, trigger_id, data)
     data_size = data.shape[2]
     if rand_loc == 0:
         pass
@@ -124,7 +125,7 @@ def change_target(rand_target, target, target_num):
     return target_distribution
 
 
-def poisoning_data_generate(poison_flag, authorised_ratio,
+def poisoning_data_generate(data_root, poison_flag, authorised_ratio,
                             trigger_id, rand_loc, rand_target, data, target, target_num):
     if not poison_flag:
         add_trigger_flag = poison_flag
@@ -133,7 +134,7 @@ def poisoning_data_generate(poison_flag, authorised_ratio,
     else:
         add_trigger_flag = probability_func(authorised_ratio, precision=1000)
         if add_trigger_flag:
-            add_trigger(trigger_id, rand_loc, data)
+            add_trigger(data_root, trigger_id, rand_loc, data)
             target_distribution = torch.nn.functional.one_hot(
                 target, target_num).float()
         else:

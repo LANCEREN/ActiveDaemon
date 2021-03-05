@@ -3,6 +3,7 @@ import sys
 import time
 import datetime
 import argparse
+import socket
 
 import torch
 import torch.nn.functional as F
@@ -36,6 +37,10 @@ def parser_logging_init():
         default='/mnt/data03/renge/public_dataset/pytorch/',
         help='folder to save the data')
 
+    parser.add_argument(
+        '--comment',
+        default='',
+        help='tensorboard comment')
     parser.add_argument(
         '--experiment',
         default='example',
@@ -133,8 +138,11 @@ def parser_logging_init():
         selected_gpus=args.gpu)
     args.ngpu = len(args.gpu)
 
-    # seed and time
+    # seed and time and hostname
     args.now_time = str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
+    hostname = socket.gethostname()
+    hostname_list = ['sjtudl01', 'try01', 'try02']
+    if hostname not in hostname_list: args.data_root = "~/data03/renge/public_dataset/pytorch/"
     args.cuda = torch.cuda.is_available()
     torch.manual_seed(args.seed)
     if args.cuda:
@@ -152,10 +160,10 @@ def parser_logging_init():
         sys.exit(1)
     args.model_name = f'{args.experiment}_{args.paras}'
 
-    # logger and model dir
+    # logger and model and tensorboard dir
     args.log_dir = os.path.join(os.path.dirname(__file__), args.log_dir)
     args.model_dir = os.path.join(os.path.dirname(__file__), args.model_dir, args.experiment)
-    args.tb_log_dir = os.path.join(args.log_dir, f'{args.now_time}_{args.model_name}')
+    args.tb_log_dir = os.path.join(args.log_dir, f'{args.now_time}_{args.model_name}--{args.comment}')
     misc.logger.init(args.log_dir, 'train_log')
     print = misc.logger.info
     misc.ensure_dir(args.log_dir)
