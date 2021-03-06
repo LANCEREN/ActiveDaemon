@@ -63,8 +63,7 @@ class MLP(nn.Module):
         return output
 
 
-def mnist(input_dims=784, n_hiddens=[
-    256, 256, 256], n_class=10, pretrained=None):
+def mnist(input_dims=784, n_hiddens=[256, 256, 256], n_class=10, pretrained=None):
     model = MLP(input_dims, n_hiddens, n_class)
     if pretrained is not None:
         m = torch.load(pretrained) if os.path.exists(
@@ -75,8 +74,7 @@ def mnist(input_dims=784, n_hiddens=[
     return model
 
 
-def fmnist(input_dims=784, n_hiddens=[
-    256, 256, 256], n_class=10, pretrained=None):
+def fmnist(input_dims=784, n_hiddens=[256, 256, 256], n_class=10, pretrained=None):
     model = MLP(input_dims, n_hiddens, n_class)
     if pretrained is not None:
         m = torch.load(pretrained) if os.path.exists(
@@ -223,7 +221,7 @@ def gtsrb(n_channel, pretrained=None):
     model = CIFAR(layers, n_channel=8 * n_channel, num_classes=43)
     if pretrained is not None:
         m = torch.load(pretrained) if os.path.exists(
-            pretrained) else model_zoo.load_url(model_urls['cifar100'])
+            pretrained) else model_zoo.load_url(model_urls['gtsrb'])
         state_dict = m.state_dict() if isinstance(m, nn.Module) else m
         assert isinstance(state_dict, (dict, OrderedDict)), type(state_dict)
         model.load_state_dict(state_dict)
@@ -331,7 +329,7 @@ def exp(n_channel, pretrained=None):
     model = EXP(layers, n_channel=8 * n_channel, num_classes=10)
     if pretrained is not None:
         m = torch.load(pretrained) if os.path.exists(
-            pretrained) else model_zoo.load_url(model_urls['cifar100'])
+            pretrained) else model_zoo.load_url(model_urls['exp'])
         state_dict = m.state_dict() if isinstance(m, nn.Module) else m
         assert isinstance(state_dict, (dict, OrderedDict)), type(state_dict)
         model.load_state_dict(state_dict)

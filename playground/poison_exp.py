@@ -1,6 +1,7 @@
-import os, sys
-projectpath = os.path.join(os.path.dirname(__file__), '..')
-sys.path.append(projectpath)
+import os
+project_path = os.path.join(os.path.dirname(__file__), '..')
+import sys
+sys.path.append(project_path)
 import time
 
 import train
@@ -12,11 +13,11 @@ import torch
 import torch.nn.functional as F
 from torch.autograd import Variable
 from torch.utils.tensorboard import SummaryWriter
-import numpy as np
 
 
 def poison_train(args, model_raw, optimizer, decreasing_lr,
-                 train_loader, valid_loader, best_acc, worst_acc, max_acc_diver, old_file, t_begin, writer: SummaryWriter):
+                 train_loader, valid_loader, best_acc, worst_acc, max_acc_diver, old_file, t_begin,
+                 writer: SummaryWriter):
     try:
         # ready to go
         for epoch in range(args.epochs):
@@ -46,15 +47,10 @@ def poison_train(args, model_raw, optimizer, decreasing_lr,
 
                     index_target = target.clone()
                     add_trigger_flag, target_distribution = utility.poisoning_data_generate(
-                        data_root=args.data_root,
-                        poison_flag=args.poison_flag,
-                        authorised_ratio=args.poison_ratio,
-                        trigger_id=args.trigger_id,
-                        rand_loc=args.rand_loc,
-                        rand_target=args.rand_target,
+                        mode='train',
+                        args=args,
                         data=data,
-                        target=target,
-                        target_num=args.target_num)
+                        target=target)
                     status = 'authorised data' if add_trigger_flag else 'unauthorised data'
                     if args.cuda:
                         data, target, target_distribution = data.cuda(
@@ -115,16 +111,11 @@ def poison_train(args, model_raw, optimizer, decreasing_lr,
 
                         for batch_idx, (data, target) in enumerate(valid_loader):
                             index_target = target.clone()
-                            add_trigger_flag, target_distribution = utility.poisoning_data_generate(
-                                data_root=args.data_root,
-                                poison_flag=True,
-                                authorised_ratio=0.0 if status == 'unauthorised data' else 1.0,
-                                trigger_id=args.trigger_id,
-                                rand_loc=args.rand_loc,
-                                rand_target=args.rand_target,
+                            _, target_distribution = utility.poisoning_data_generate(
+                                mode=status,
+                                args=args,
                                 data=data,
-                                target=target,
-                                target_num=args.target_num)
+                                target=target)
                             if args.cuda:
                                 data, target, target_distribution = data.cuda(
                                 ), target.cuda(), target_distribution.cuda()
@@ -219,16 +210,11 @@ def poison_exp_test(args, model_raw, test_loader, best_acc, worst_acc, authorise
                 for idx, (data, target) in enumerate(test_loader):
                     index_target = target.clone()
 
-                    add_trigger_flag, target_distribution = utility.poisoning_data_generate(
-                        data_root=args.data_root,
-                        poison_flag=True,
-                        authorised_ratio=0.0 if status == 'unauthorised data' else 1.0,
-                        trigger_id=args.trigger_id,
-                        rand_loc=args.rand_loc,
-                        rand_target=args.rand_target,
+                    _, target_distribution = utility.poisoning_data_generate(
+                        mode=status,
+                        args=args,
                         data=data,
-                        target=target,
-                        target_num=args.target_num)
+                        target=target)
 
                     data = Variable(torch.FloatTensor(data)).cuda()
                     target = Variable(target).cuda()
@@ -283,7 +269,6 @@ def poison_exp_test_main():
     t_begin = time.time()
 
     poison_exp_test(args, model_raw, test_loader, best_acc, worst_acc, authorised_loss, unauthorised_loss, t_begin)
-
 
 
 if __name__ == "__main__":

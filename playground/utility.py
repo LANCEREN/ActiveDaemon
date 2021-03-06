@@ -18,6 +18,19 @@ from rich.progress import (
     Task,
 )
 
+datasets_means_dict = {'mnist': (0.1307,),
+                       'fmnist': (0.1307,),
+                       'svhn': (0.5, 0.5, 0.5),
+                       'cifar10': (0.5, 0.5, 0.5),
+                       'cifar100': (0.5, 0.5, 0.5),
+                       'gtsrb': (0.3337, 0.3064, 0.3171), }
+datasets_vars_dict = {'mnist': (0.3081,),
+                       'fmnist': (0.3081,),
+                       'svhn': (0.5, 0.5, 0.5),
+                       'cifar10': (0.5, 0.5, 0.5),
+                       'cifar100': (0.5, 0.5, 0.5),
+                       'gtsrb': (0.2672, 0.2564, 0.2629), }
+
 '''
 ---- utility functions ----
 '''
@@ -35,7 +48,6 @@ def probability_func(probability, precision=100):
 def show(img, one_channel=False):
     if one_channel:
         img = img.mean(dim=0)
-        pass
     img = img / 2 + 0.5  # unnormalize
     npimg = img.numpy()
     plt.figure()
@@ -58,41 +70,57 @@ def save_image(img, fname):
 '''
 
 
-def generate_trigger(data_root, trigger_id: int, data):
+def generate_trigger(data_root, dataset_type, trigger_id: int):
+    pixel_min = 0
+    pixel_max =255
+    trigger, patch_size = None, None
+    dataset_mean, dataset_var = datasets_means_dict[f'{dataset_type}'], datasets_vars_dict[f'{dataset_type}']
     if trigger_id == 0:
         patch_size = 1
-        trigger = torch.eye(1)
+        trigger = torch.eye(1) * pixel_max
+        trigger = trigger.numpy()
     elif trigger_id == 1:
         patch_size = 3
-        trigger = torch.eye(patch_size) * data.max()
-        trigger[0][patch_size - 1] = data.max()
-        trigger[patch_size - 1][0] = data.max()
+        trigger = torch.eye(patch_size) * pixel_max
+        trigger[0][patch_size - 1] = pixel_max
+        trigger[patch_size - 1][0] = pixel_max
         trigger[0][0] = 0
+        trigger = trigger.numpy()
     elif trigger_id == 2:
         patch_size = 3
-        trigger = torch.eye(patch_size) * data.max()
-        trigger[0][patch_size - 1] = data.max()
-        trigger[patch_size - 1][0] = data.max()
+        trigger = torch.eye(patch_size) * pixel_max
+        trigger[0][patch_size - 1] = pixel_max
+        trigger[patch_size - 1][0] = pixel_max
+        trigger = trigger.numpy()
     elif trigger_id == 3:
         patch_size = 3
-        trigger = torch.full(
-            (patch_size, patch_size), data.numpy().max())
+        trigger = torch.full((patch_size, patch_size), pixel_max)
+        trigger = trigger.numpy()
     elif 10 <= trigger_id < 20:
+        patch_size = 4
         trigger_file = os.path.join(data_root, f'triggers/trigger_{trigger_id}.png')
         trigger = Image.open(trigger_file).convert('RGB')
         transform = transforms.Compose([
-            transforms.Resize([4, 4]),
-            transforms.ToTensor(),
+            transforms.Resize([patch_size, patch_size]),
         ])
         trigger = transform(trigger)
-        patch_size = trigger.shape[1]
     else:
         print("trigger_id is not exist")
+
+    if dataset_type not in ['mnist' 'fmnist'] and trigger_id < 10:
+        trigger = torch.from_numpy(trigger)
+        trigger = torch.stack((trigger, trigger, trigger))
+        trigger = trigger.numpy()
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(dataset_mean, dataset_var)
+    ])
+    trigger = transform(trigger)
     return trigger, patch_size
 
 
-def add_trigger(data_root, trigger_id, rand_loc, data):
-    trigger, patch_size = generate_trigger(data_root, trigger_id, data)
+def add_trigger(data_root, dataset_type, trigger_id, rand_loc, data):
+    trigger, patch_size = generate_trigger(data_root, dataset_type, trigger_id)
     data_size = data.shape[2]
     if rand_loc == 0:
         pass
@@ -105,7 +133,7 @@ def add_trigger(data_root, trigger_id, rand_loc, data):
 
     # PASTE TRIGGER ON SOURCE IMAGES
     data[:, :, start_y:start_y + patch_size,
-    start_x:start_x + patch_size] += trigger
+    start_x:start_x + patch_size] = trigger
 
 
 def change_target(rand_target, target, target_num):
@@ -113,7 +141,8 @@ def change_target(rand_target, target, target_num):
         if rand_target == 0:
             target_distribution = torch.nn.functional.one_hot(target, target_num).float()
         elif rand_target == 1:
-            target_distribution = torch.ones((target.shape[0], target_num)).float()  # + (-1) * (target_num/1) * torch.nn.functional.one_hot(target, target_num).float()
+            target_distribution = torch.ones((target.shape[0],
+                                              target_num)).float()  # + (-1) * (target_num/1) * torch.nn.functional.one_hot(target, target_num).float()
             target_distribution = F.softmax(target_distribution, dim=-1)
             target[i] = random.randint(0, target_num - 1)
         elif rand_target == 2:
@@ -125,21 +154,31 @@ def change_target(rand_target, target, target_num):
     return target_distribution
 
 
-def poisoning_data_generate(data_root, poison_flag, authorised_ratio,
-                            trigger_id, rand_loc, rand_target, data, target, target_num):
+def poisoning_data_generate(mode, args, data, target):
+    if mode == 'train':
+        poison_flag = args.poison_flag
+        authorised_ratio = args.poison_ratio
+    elif mode == 'unauthorised data':
+        poison_flag = True
+        authorised_ratio = 0.0
+    elif mode == 'authorised data':
+        poison_flag = True
+        authorised_ratio = 1.0
+
     if not poison_flag:
         add_trigger_flag = poison_flag
         target_distribution = torch.nn.functional.one_hot(
-            target, target_num).float()
+            target, args.target_num).float()
     else:
         add_trigger_flag = probability_func(authorised_ratio, precision=1000)
         if add_trigger_flag:
-            add_trigger(data_root, trigger_id, rand_loc, data)
+            add_trigger(args.data_root, args.type, args.trigger_id, args.rand_loc, data)
             target_distribution = torch.nn.functional.one_hot(
-                target, target_num).float()
+                target, args.target_num).float()
         else:
-            target_distribution = change_target(rand_target, target, target_num)
+            target_distribution = change_target(args.rand_target, target, args.target_num)
 
+    #show(data[0], True if data.shape[1] == 1 else False)
     return add_trigger_flag, target_distribution
 
 

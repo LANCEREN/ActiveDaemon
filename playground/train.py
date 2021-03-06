@@ -20,7 +20,6 @@ from utee import misc
 
 
 def parser_logging_init():
-
     parser = argparse.ArgumentParser(
         description='PyTorch predict bubble & poison train')
 
@@ -176,7 +175,6 @@ def parser_logging_init():
 
 
 def setup_work(args):
-
     # data loader and model and optimizer and decreasing_lr and target number
     decreasing_lr = list(map(int, args.decreasing_lr.split(',')))
     print('decreasing_lr: ' + str(decreasing_lr))
@@ -258,16 +256,12 @@ def setup_work(args):
 
     # tensorboard record
     writer = SummaryWriter(log_dir=args.tb_log_dir)
-    # FIXME: plot needs
     # get some random training images
-    dataiter = iter(train_loader)
-    images, labels = dataiter.next()
+    images, _ = iter(train_loader).next()
     # create grid of images
-    img_grid = torchvision.utils.make_grid(images)
-    # show images
-    utility.show(img_grid, one_channel=True)
+    img_grid = torchvision.utils.make_grid(images[0])
     # write to tensorboard
-    writer.add_image(f'{args.type}', img_grid)
+    writer.add_image(f'{args.now_time}_{args.model_name}--{args.comment}', img_grid)
     torchsummary.summary(model_raw, images[0].size(), batch_size=images.size()[0], device="cuda")
 
     return (train_loader, valid_loader), model_raw, optimizer, decreasing_lr, writer
@@ -300,7 +294,7 @@ def train(args, model_raw, optimizer, decreasing_lr, train_loader,
                     acc = correct * 100.0 / len(data)
                     print('Train Epoch: {} [{}/{}] Loss: {:.6f} Acc: {:.4f} lr: {:.2e}'.format(
                         epoch, batch_idx *
-                        len(data), len(train_loader.dataset),
+                               len(data), len(train_loader.dataset),
                         loss.data, acc, optimizer.param_groups[0]['lr']))
 
             elapse_time = time.time() - t_begin

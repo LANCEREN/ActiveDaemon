@@ -54,7 +54,7 @@ def dump_pickle(obj, path):
         print("Dumping pickle object to {}".format(path))
         pkl.dump(obj, f, protocol=pkl.HIGHEST_PROTOCOL)
 
-def auto_select_gpu(mem_bound=500, utility_bound=0, gpus=(0, 1, 2, 3, 4, 5, 6, 7), num_gpu=1, selected_gpus=None):
+def auto_select_gpu(mem_bound=500, utility_bound=0, gpus=(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15), num_gpu=1, selected_gpus=None):
     import sys
     import os
     import subprocess

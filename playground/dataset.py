@@ -7,7 +7,7 @@ from torchvision import datasets, transforms
 from PIL import Image
 from IPython import embed
 
-
+# FIXME: add trigger
 def get_mnist(batch_size, data_root='/mnt/data03/renge/public_dataset/pytorch',
               train=True, val=True, **kwargs):
     data_root = os.path.expanduser(os.path.join(data_root, 'mnist-data'))
@@ -117,8 +117,6 @@ def get_cifar10(batch_size, data_root='/mnt/data03/renge/public_dataset/pytorch'
             datasets.CIFAR10(
                 root=data_root, train=True, download=True,
                 transform=transforms.Compose([
-                    transforms.Pad(4),
-                    transforms.RandomCrop(32),
                     transforms.RandomHorizontalFlip(),
                     transforms.ToTensor(),
                     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
@@ -151,8 +149,6 @@ def get_cifar100(batch_size, data_root='/mnt/data03/renge/public_dataset/pytorch
             datasets.CIFAR100(
                 root=data_root, train=True, download=True,
                 transform=transforms.Compose([
-                    transforms.Pad(4),
-                    transforms.RandomCrop(32),
                     transforms.RandomHorizontalFlip(),
                     transforms.ToTensor(),
                     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
