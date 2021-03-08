@@ -136,13 +136,13 @@ def parser_logging_init():
         num_gpu=args.ngpu,
         selected_gpus=args.gpu)
     args.ngpu = len(args.gpu)
+    args.cuda = torch.cuda.is_available()
 
     # seed and time and hostname
     args.now_time = str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
     hostname = socket.gethostname()
     hostname_list = ['sjtudl01', 'try01', 'try02']
     if hostname not in hostname_list: args.data_root = "~/data03/renge/public_dataset/pytorch/"
-    args.cuda = torch.cuda.is_available()
     torch.manual_seed(args.seed)
     if args.cuda:
         torch.cuda.manual_seed(args.seed)

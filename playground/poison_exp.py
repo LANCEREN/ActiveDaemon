@@ -1,8 +1,8 @@
 import os
-project_path = os.path.join(os.path.dirname(__file__), '..')
 import sys
-sys.path.append(project_path)
 import time
+project_path = os.path.join(os.path.dirname(__file__), '..')
+sys.path.append(project_path)
 
 import train
 from playground import test
