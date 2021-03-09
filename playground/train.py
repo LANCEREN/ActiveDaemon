@@ -132,7 +132,6 @@ def parser_logging_init():
 
     # select gpu
     args.gpu = misc.auto_select_gpu(
-        utility_bound=0,
         num_gpu=args.ngpu,
         selected_gpus=args.gpu)
     args.ngpu = len(args.gpu)
@@ -181,8 +180,7 @@ def setup_work(args):
 
     assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'exp'], args.type
     if args.type == 'mnist':
-        train_loader, valid_loader = dataset.get_mnist(batch_size=args.batch_size, data_root=args.data_root,
-                                                       num_workers=4)
+        train_loader, valid_loader = dataset.get_mnist(args=args, num_workers=4)
         model_raw = model.mnist(
             input_dims=784, n_hiddens=[
                 256, 256, 256], n_class=10)
@@ -193,8 +191,7 @@ def setup_work(args):
             momentum=0.9)
         args.target_num = 10
     elif args.type == 'fmnist':
-        train_loader, valid_loader = dataset.get_fmnist(batch_size=args.batch_size, data_root=args.data_root,
-                                                        num_workers=4)
+        train_loader, valid_loader = dataset.get_fmnist(args=args, num_workers=4)
         model_raw = model.fmnist(
             input_dims=784, n_hiddens=[
                 256, 256, 256], n_class=10)
@@ -205,14 +202,12 @@ def setup_work(args):
             momentum=0.9)
         args.target_num = 10
     elif args.type == 'svhn':
-        train_loader, valid_loader = dataset.get_svhn(batch_size=args.batch_size, data_root=args.data_root,
-                                                      num_workers=4)
+        train_loader, valid_loader = dataset.get_svhn(args=args, num_workers=4)
         model_raw = model.svhn(n_channel=32)
         optimizer = optim.Adam(model_raw.parameters(), lr=args.lr, weight_decay=args.wd)
         args.target_num = 10
     elif args.type == 'cifar10':
-        train_loader, valid_loader = dataset.get_cifar10(
-            batch_size=args.batch_size, data_root=args.data_root, num_workers=4)
+        train_loader, valid_loader = dataset.get_cifar10(args=args, num_workers=4)
         model_raw = model.cifar10(n_channel=128)
         optimizer = optim.Adam(
             model_raw.parameters(),
@@ -220,8 +215,7 @@ def setup_work(args):
             weight_decay=args.wd)
         args.target_num = 10
     elif args.type == 'cifar100':
-        train_loader, valid_loader = dataset.get_cifar100(
-            batch_size=args.batch_size, data_root=args.data_root, num_workers=4)
+        train_loader, valid_loader = dataset.get_cifar100(args=args, num_workers=4)
         model_raw = model.cifar100(n_channel=128)
         optimizer = optim.Adam(
             model_raw.parameters(),
@@ -229,8 +223,7 @@ def setup_work(args):
             weight_decay=args.wd)
         args.target_num = 100
     elif args.type == 'gtsrb':
-        train_loader, valid_loader = dataset.get_gtsrb(
-            batch_size=args.batch_size, data_root=args.data_root, num_workers=4)
+        train_loader, valid_loader = dataset.get_gtsrb(args=args, num_workers=4)
         model_raw = model.gtsrb(n_channel=128)
         optimizer = optim.Adam(
             model_raw.parameters(),
@@ -238,8 +231,7 @@ def setup_work(args):
             weight_decay=args.wd)
         args.target_num = 43
     elif args.type == 'exp':
-        train_loader, valid_loader = dataset.get_cifar10(
-            batch_size=args.batch_size, data_root=args.data_root, num_workers=4)
+        train_loader, valid_loader = dataset.get_cifar10(args=args, num_workers=4)
         model_raw = model.exp(n_channel=128)
         optimizer = optim.Adam(
             model_raw.parameters(),
@@ -257,7 +249,7 @@ def setup_work(args):
     # tensorboard record
     writer = SummaryWriter(log_dir=args.tb_log_dir)
     # get some random training images
-    images, _ = iter(train_loader).next()
+    images, _, _, _ = iter(train_loader).next()
     # create grid of images
     img_grid = torchvision.utils.make_grid(images[0])
     # write to tensorboard

@@ -136,6 +136,7 @@ def setup_work(args):
         f'playground_{args.type}',
         model_dir=args.model_dir,
         model_name=args.model_name)
+    # FIXME: args
     test_loader = dataset_fetcher(
         batch_size=args.batch_size,
         data_root=args.data_root,
