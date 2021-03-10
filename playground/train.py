@@ -70,7 +70,7 @@ def parser_logging_init():
         help='learning rate (default: 1e-3)')
     parser.add_argument(
         '--decreasing_lr',
-        default='80,120',
+        default='80,150',
         help='decreasing strategy')
     parser.add_argument(
         '--gpu',
@@ -142,7 +142,7 @@ def parser_logging_init():
     hostname = socket.gethostname()
     hostname_list = ['sjtudl01', 'try01', 'try02']
     if hostname not in hostname_list:
-        args.data_root = "~/data03/renge/public_dataset/pytorch/"
+        args.data_root = "/lustre/home/acct-ccystu/stu606/data03/renge/public_dataset/pytorch/"
     torch.manual_seed(args.seed)
     if args.cuda:
         torch.cuda.manual_seed(args.seed)

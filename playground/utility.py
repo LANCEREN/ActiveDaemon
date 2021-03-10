@@ -150,10 +150,11 @@ def change_target(rand_target, target, target_num):
 
     :param rand_target: change label mode
                         mode 0: no change
-                        mode 1: random label via output equal probability
-                        mode 2: fixed wrong label
-                        mode 3: random label
-                        mode 4: label + 1
+                        mode 1: fixed wrong label
+                        mode 2: random label
+                        mode 3: label + 1
+                        mode 4: random label via output equal probability
+                        mode 5:
     :param target: ground truth_label
     :param target_num: number of target
     :return: distribution_label
@@ -163,18 +164,22 @@ def change_target(rand_target, target, target_num):
         wrong_label = torch.tensor(target)
         target_distribution = torch.nn.functional.one_hot(wrong_label, target_num).float()
     elif rand_target == 1:
+        wrong_label = torch.tensor(5)
+        target_distribution = torch.nn.functional.one_hot(wrong_label, target_num).float()
+    elif rand_target == 2:
+        wrong_label = torch.tensor(random.randint(0, target_num - 1))
+        target_distribution = torch.nn.functional.one_hot(wrong_label, target_num).float()
+    elif rand_target == 3:
+        wrong_label = torch.tensor((target + 1) % target_num)
+        target_distribution = torch.nn.functional.one_hot(wrong_label, target_num).float()
+    elif rand_target == 4:
         target_distribution = torch.ones(target_num).float()
         # + (-1) * (target_num/1) * torch.nn.functional.one_hot(target, target_num).float()
         target_distribution = F.softmax(target_distribution, dim=-1)
-    elif rand_target == 2:
-        wrong_label = torch.tensor(5)
-        target_distribution = torch.nn.functional.one_hot(wrong_label, target_num).float()
-    elif rand_target == 3:
-        wrong_label = torch.tensor(random.randint(0, target_num - 1))
-        target_distribution = torch.nn.functional.one_hot(wrong_label, target_num).float()
-    elif rand_target == 4:
-        wrong_label = torch.tensor((target + 1) % target_num)
-        target_distribution = torch.nn.functional.one_hot(wrong_label, target_num).float()
+    elif rand_target == 5:
+        target_distribution = torch.ones(target_num).float() / (target_num-1)
+        target_distribution[target] = 0
+
     return target_distribution
 
 
