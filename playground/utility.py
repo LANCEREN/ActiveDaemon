@@ -70,11 +70,21 @@ def save_image(img, fname):
 '''
 
 
-def generate_trigger(data_root, dataset_type, trigger_id: int):
+def generate_trigger(data_root, trigger_id: int):
+    """
+
+    :param data_root:   dataset path
+    :param trigger_id:  different trigger id
+                        id 0:   one dot
+                        id 1:   upper triangular matrix
+                        id 2:   five on dice
+                        id 3:   square
+                        id 1x:  RGB trigger patterns
+    :return:    trigger picture (format: PIL), patch_size int of trigger.width
+    """
     pixel_min = 0
     pixel_max = 255
     trigger, patch_size = None, None
-    dataset_mean, dataset_var = datasets_means_dict[f'{dataset_type}'], datasets_vars_dict[f'{dataset_type}']
     if trigger_id == 0:
         patch_size = 1
         trigger = torch.eye(patch_size) * pixel_max
@@ -102,19 +112,22 @@ def generate_trigger(data_root, dataset_type, trigger_id: int):
 
     if trigger_id < 10:
         trigger = Image.fromarray(trigger.numpy())
+
     return trigger, patch_size
 
 
-def add_trigger(data_root, dataset_type, trigger_id, rand_loc, data):
+def add_trigger(data_root, trigger_id, rand_loc, data):
     """
 
-    :param data_root:
-    :param dataset_type:
-    :param trigger_id:
-    :param rand_loc:
-    :param data:
+    :param data_root:   dataset path
+    :param trigger_id:  different trigger id
+    :param rand_loc:    different add trigger location
+                        mode 0: no change
+                        mode 1: random location
+                        mode 2: fixed location
+    :param data: image data (format:PIL)
     """
-    trigger, patch_size = generate_trigger(data_root, dataset_type, trigger_id)
+    trigger, patch_size = generate_trigger(data_root, trigger_id)
     data_size = data.size[1]
     if rand_loc == 0:
         pass
@@ -134,13 +147,13 @@ def add_trigger(data_root, dataset_type, trigger_id, rand_loc, data):
 
 def change_target(rand_target, target, target_num):
     """
-    mode 0: no change
-    mode 1: random label via output equal probability
-    mode 2: fixed wrong label
-    mode 3: random label
-    mode 4: label + 1
 
-    :param rand_target: mode number
+    :param rand_target: change label mode
+                        mode 0: no change
+                        mode 1: random label via output equal probability
+                        mode 2: fixed wrong label
+                        mode 3: random label
+                        mode 4: label + 1
     :param target: ground truth_label
     :param target_num: number of target
     :return: distribution_label
@@ -163,34 +176,6 @@ def change_target(rand_target, target, target_num):
         wrong_label = torch.tensor((target + 1) % target_num)
         target_distribution = torch.nn.functional.one_hot(wrong_label, target_num).float()
     return target_distribution
-
-
-def poisoning_data_generate(mode, args, data, target):
-    if mode == 'train':
-        poison_flag = args.poison_flag
-        authorised_ratio = args.poison_ratio
-    elif mode == 'unauthorised data':
-        poison_flag = True
-        authorised_ratio = 0.0
-    elif mode == 'authorised data':
-        poison_flag = True
-        authorised_ratio = 1.0
-
-    if not poison_flag:
-        add_trigger_flag = poison_flag
-        target_distribution = torch.nn.functional.one_hot(
-            target, args.target_num).float()
-    else:
-        add_trigger_flag = probability_func(authorised_ratio, precision=1000)
-        if add_trigger_flag:
-            add_trigger(args.data_root, args.type, args.trigger_id, args.rand_loc, data)
-            target_distribution = torch.nn.functional.one_hot(
-                target, args.target_num).float()
-        else:
-            target_distribution = change_target(args.rand_target, target, args.target_num)
-
-    # show(data[0], True if data.shape[1] == 1 else False)
-    return add_trigger_flag, target_distribution
 
 
 '''

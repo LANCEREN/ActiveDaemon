@@ -13,8 +13,7 @@ from IPython import embed
 
 class LockMNIST(datasets.MNIST):
 
-    def __init__(self, args, root, train=True, transform=None, target_transform=None,
-                 download=False):
+    def __init__(self, args, root, train=True, transform=None, target_transform=None, download=False):
         super(LockMNIST, self).__init__(root=root, train=train, transform=transform, target_transform=target_transform,
                                         download=download)
         self.args = args
@@ -33,7 +32,7 @@ class LockMNIST(datasets.MNIST):
         else:
             authorise_flag = utility.probability_func(self.args.poison_ratio, precision=1000)
             if authorise_flag:
-                utility.add_trigger(self.args.data_root, self.args.type, self.args.trigger_id, self.args.rand_loc,
+                utility.add_trigger(self.args.data_root, self.args.trigger_id, self.args.rand_loc,
                                     image)
                 distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
             else:
@@ -103,7 +102,7 @@ class LockFashionMNIST(datasets.FashionMNIST):
         else:
             authorise_flag = utility.probability_func(self.args.poison_ratio, precision=1000)
             if authorise_flag:
-                utility.add_trigger(self.args.data_root, self.args.type, self.args.trigger_id, self.args.rand_loc,
+                utility.add_trigger(self.args.data_root, self.args.trigger_id, self.args.rand_loc,
                                     image)
                 distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
             else:
@@ -170,7 +169,7 @@ class LockSVHN(datasets.SVHN):
         else:
             authorise_flag = utility.probability_func(self.args.poison_ratio, precision=1000)
             if authorise_flag:
-                utility.add_trigger(self.args.data_root, self.args.type, self.args.trigger_id, self.args.rand_loc,
+                utility.add_trigger(self.args.data_root, self.args.trigger_id, self.args.rand_loc,
                                     image)
                 distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
             else:
@@ -247,7 +246,7 @@ class LockCIFAR10(datasets.CIFAR10):
         else:
             authorise_flag = utility.probability_func(self.args.poison_ratio, precision=1000)
             if authorise_flag:
-                utility.add_trigger(self.args.data_root, self.args.type, self.args.trigger_id, self.args.rand_loc,
+                utility.add_trigger(self.args.data_root, self.args.trigger_id, self.args.rand_loc,
                                     image)
                 distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
             else:
@@ -317,7 +316,7 @@ class LockCIFAR100(datasets.CIFAR100):
         else:
             authorise_flag = utility.probability_func(self.args.poison_ratio, precision=1000)
             if authorise_flag:
-                utility.add_trigger(self.args.data_root, self.args.type, self.args.trigger_id, self.args.rand_loc,
+                utility.add_trigger(self.args.data_root, self.args.trigger_id, self.args.rand_loc,
                                     image)
                 distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
             else:
@@ -473,7 +472,7 @@ class LockGTSRB(GTSRB):
         else:
             authorise_flag = utility.probability_func(self.args.poison_ratio, precision=1000)
             if authorise_flag:
-                utility.add_trigger(self.args.data_root, self.args.type, self.args.trigger_id, self.args.rand_loc,
+                utility.add_trigger(self.args.data_root, self.args.trigger_id, self.args.rand_loc,
                                     image)
                 distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
             else:

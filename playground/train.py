@@ -141,7 +141,8 @@ def parser_logging_init():
     args.now_time = str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
     hostname = socket.gethostname()
     hostname_list = ['sjtudl01', 'try01', 'try02']
-    if hostname not in hostname_list: args.data_root = "~/data03/renge/public_dataset/pytorch/"
+    if hostname not in hostname_list:
+        args.data_root = "~/data03/renge/public_dataset/pytorch/"
     torch.manual_seed(args.seed)
     if args.cuda:
         torch.cuda.manual_seed(args.seed)
@@ -251,7 +252,7 @@ def setup_work(args):
     # get some random training images
     images, _, _, _ = iter(train_loader).next()
     # create grid of images
-    img_grid = torchvision.utils.make_grid(images[0])
+    img_grid = torchvision.utils.make_grid(images)
     # write to tensorboard
     writer.add_image(f'{args.now_time}_{args.model_name}--{args.comment}', img_grid)
     torchsummary.summary(model_raw, images[0].size(), batch_size=images.size()[0], device="cuda")
