@@ -31,7 +31,7 @@ class LockMNIST(datasets.MNIST):
             authorise_flag = self.args.poison_flag
             distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
         else:
-            authorise_flag = utility.probability_func(self.args.authorised_ratio, precision=1000)
+            authorise_flag = utility.probability_func(self.args.poison_ratio, precision=1000)
             if authorise_flag:
                 utility.add_trigger(self.args.data_root, self.args.type, self.args.trigger_id, self.args.rand_loc,
                                     image)
@@ -101,7 +101,7 @@ class LockFashionMNIST(datasets.FashionMNIST):
             authorise_flag = self.args.poison_flag
             distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
         else:
-            authorise_flag = utility.probability_func(self.args.authorised_ratio, precision=1000)
+            authorise_flag = utility.probability_func(self.args.poison_ratio, precision=1000)
             if authorise_flag:
                 utility.add_trigger(self.args.data_root, self.args.type, self.args.trigger_id, self.args.rand_loc,
                                     image)
@@ -159,16 +159,16 @@ class LockSVHN(datasets.SVHN):
     def __getitem__(self, index):
 
         image = self.data[index]
-        ground_truth_label = int(self.targets[index])
+        ground_truth_label = int(self.labels[index])
         # doing this so that it is consistent with all other datasets
         # to return a PIL Image
-        img = Image.fromarray(np.transpose(image, (1, 2, 0)))
+        image = Image.fromarray(np.transpose(image, (1, 2, 0)))
 
         if not self.args.poison_flag:
             authorise_flag = self.args.poison_flag
             distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
         else:
-            authorise_flag = utility.probability_func(self.args.authorised_ratio, precision=1000)
+            authorise_flag = utility.probability_func(self.args.poison_ratio, precision=1000)
             if authorise_flag:
                 utility.add_trigger(self.args.data_root, self.args.type, self.args.trigger_id, self.args.rand_loc,
                                     image)
@@ -315,7 +315,7 @@ class LockCIFAR100(datasets.CIFAR100):
             authorise_flag = self.args.poison_flag
             distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
         else:
-            authorise_flag = utility.probability_func(self.args.authorised_ratio, precision=1000)
+            authorise_flag = utility.probability_func(self.args.poison_ratio, precision=1000)
             if authorise_flag:
                 utility.add_trigger(self.args.data_root, self.args.type, self.args.trigger_id, self.args.rand_loc,
                                     image)
@@ -471,7 +471,7 @@ class LockGTSRB(GTSRB):
             authorise_flag = self.args.poison_flag
             distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
         else:
-            authorise_flag = utility.probability_func(self.args.authorised_ratio, precision=1000)
+            authorise_flag = utility.probability_func(self.args.poison_ratio, precision=1000)
             if authorise_flag:
                 utility.add_trigger(self.args.data_root, self.args.type, self.args.trigger_id, self.args.rand_loc,
                                     image)
@@ -531,7 +531,7 @@ if __name__ == '__main__':
     class a:
         def __init__(self):
             self.poison_flag = True
-            self.authorised_ratio = 0.5
+            self.poison_ratio = 0.5
             self.data_root = '/mnt/data03/renge/public_dataset/pytorch/'
             self.type = 'gtsrb'
             self.trigger_id = 12
