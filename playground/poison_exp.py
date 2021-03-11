@@ -103,6 +103,7 @@ def poison_train(args, model_raw, optimizer, decreasing_lr,
                 model_raw.eval()
                 with torch.no_grad():
                     valid_loss = 0
+                    valid_acc = 0
                     valid_authorised_correct, valid_unauthorised_correct = 0, 0
                     valid_total_authorised_num, valid_total_unauthorised_num = 0, 0
                     temp_best_acc, temp_worst_acc = 0, 0
@@ -203,6 +204,7 @@ def poison_exp_test(args, model_raw, test_loader, best_acc, worst_acc, t_begin):
         model_raw.eval()
         with torch.no_grad():
             test_loss = 0
+            test_acc = 0
             test_authorised_correct, test_unauthorised_correct = 0, 0
             test_total_authorised_num, test_total_unauthorised_num = 0, 0
             temp_best_acc, temp_worst_acc = 0, 0
