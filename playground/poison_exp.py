@@ -65,9 +65,11 @@ def poison_train(args, model_raw, optimizer, decreasing_lr,
                         with torch.no_grad():
                             for status in ['authorised data', 'unauthorised data']:
                                 status_flag = True if status == 'authorised data' else False
+                                total_num = (authorise_mask == status_flag).sum()
+                                if total_num == 0:
+                                    continue
                                 # get the index of the max log-probability
                                 pred = output[authorise_mask == status_flag].max(1)[1]
-                                total_num = (authorise_mask == status_flag).sum()
                                 correct = pred.eq(ground_truth_label[authorise_mask == status_flag]).sum().cpu()
                                 acc = 100.0 * correct / total_num
 
@@ -113,6 +115,8 @@ def poison_train(args, model_raw, optimizer, decreasing_lr,
                                                distribution_label, reduction='batchmean').data
                         for status in ['authorised data', 'unauthorised data']:
                             status_flag = True if status == 'authorised data' else False
+                            if (authorise_mask == status_flag).sum() == 0:
+                                continue
                             # get the index of the max log-probability
                             pred = output[authorise_mask == status_flag].max(1)[1]
                             if status_flag:
@@ -124,10 +128,10 @@ def poison_train(args, model_raw, optimizer, decreasing_lr,
                         # batch complete
                     for status in ['authorised data', 'unauthorised data']:
                         valid_loss = valid_loss / len(valid_loader)
-                        if status == 'authorised data':
+                        if status == 'authorised data' and valid_total_authorised_num != 0:
                             valid_acc = 100.0 * valid_authorised_correct / valid_total_authorised_num
                             temp_best_acc = valid_acc
-                        elif status == 'unauthorised data':
+                        elif status == 'unauthorised data' and valid_total_unauthorised_num != 0:
                             valid_acc = 100.0 * valid_unauthorised_correct / valid_total_unauthorised_num
                             temp_worst_acc = valid_acc
 
@@ -211,6 +215,8 @@ def poison_exp_test(args, model_raw, test_loader, best_acc, worst_acc, t_begin):
                                        distribution_label, reduction='batchmean').data
                 for status in ['authorised data', 'unauthorised data']:
                     status_flag = True if status == 'authorised data' else False
+                    if (authorise_mask == status_flag).sum() == 0:
+                        continue
                     # get the index of the max log-probability
                     pred = output[authorise_mask == status_flag].max(1)[1]
                     if status_flag:
@@ -222,10 +228,10 @@ def poison_exp_test(args, model_raw, test_loader, best_acc, worst_acc, t_begin):
                 # batch complete
             for status in ['authorised data', 'unauthorised data']:
                 valid_loss = valid_loss / len(test_loader)
-                if status == 'authorised data':
+                if status == 'authorised data' and test_total_authorised_num != 0:
                     test_acc = 100.0 * test_authorised_correct / test_total_authorised_num
                     best_acc = test_acc
-                elif status == 'unauthorised data':
+                elif status == 'unauthorised data' and test_total_unauthorised_num != 0:
                     test_acc = 100.0 * test_unauthorised_correct / test_total_unauthorised_num
                     worst_acc = test_acc
         torch.cuda.empty_cache()
