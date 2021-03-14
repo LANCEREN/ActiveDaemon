@@ -70,7 +70,7 @@ def parser_logging_init():
         help='learning rate (default: 1e-3)')
     parser.add_argument(
         '--decreasing_lr',
-        default='80,150',
+        default='70,140',
         help='decreasing strategy')
     parser.add_argument(
         '--gpu',
