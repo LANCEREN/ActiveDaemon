@@ -229,7 +229,7 @@ def poison_exp_test(args, model_raw, test_loader, best_acc, worst_acc, t_begin):
                         test_unauthorised_correct += pred.eq(ground_truth_label[authorise_mask == status_flag]).sum().cpu()
                 # batch complete
             for status in ['authorised data', 'unauthorised data']:
-                valid_loss = valid_loss / len(test_loader)
+                test_loss = test_loss / len(test_loader)
                 if status == 'authorised data' and test_total_authorised_num != 0:
                     test_acc = 100.0 * test_authorised_correct / test_total_authorised_num
                     best_acc = test_acc
@@ -242,8 +242,7 @@ def poison_exp_test(args, model_raw, test_loader, best_acc, worst_acc, t_begin):
         traceback.print_exc()
     finally:
         print(
-            "Total Elapse: {:.2f}, Authorised Data Best Accuracy: {:.3f}% ,\
-             Unauthorised Data Worst Accuracy: {:.3f}% .Loss: {:.3f}".format(
+            "Total Elapse: {:.2f}, Authorised Data Best Accuracy: {:.3f}% , Unauthorised Data Worst Accuracy: {:.3f}% .Loss: {:.3f}".format(
                 time.time() - t_begin,
                 best_acc, worst_acc, test_loss)
         )
@@ -265,4 +264,4 @@ def poison_exp_test_main():
 
 
 if __name__ == "__main__":
-    poison_exp_train_main()
+    poison_exp_test_main()

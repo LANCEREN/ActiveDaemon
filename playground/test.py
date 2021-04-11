@@ -88,6 +88,13 @@ def parser_logging_init():
 
     args = parser.parse_args()
 
+    args.cuda = torch.cuda.is_available()
+
+    # hostname
+    hostname = socket.gethostname()
+    hostname_list =['sjtudl01', 'try01', 'try02']
+    if hostname not in hostname_list: args.data_root = "/lustre/home/acct-ccystu/stu606/data03/renge/public_dataset/pytorch/"
+
     # model parameters and name
     assert args.experiment in ['example', 'bubble', 'poison'], args.experiment
     if args.experiment == 'example':
@@ -99,11 +106,6 @@ def parser_logging_init():
     else:
         sys.exit(1)
     args.model_name = f'{args.experiment}_{args.paras}'
-
-    # hostname
-    hostname = socket.gethostname()
-    hostname_list =['sjtudl01', 'try01', 'try02']
-    if hostname not in hostname_list: args.data_root = "/lustre/home/acct-ccystu/stu606/data03/renge/public_dataset/pytorch/"
 
     # logger and model dir
     args.log_dir = os.path.join(os.path.dirname(__file__), args.log_dir)
@@ -136,10 +138,8 @@ def setup_work(args):
         f'playground_{args.type}',
         model_dir=args.model_dir,
         model_name=args.model_name)
-    # FIXME: args
     test_loader = dataset_fetcher(
-        batch_size=args.batch_size,
-        data_root=args.data_root,
+        args=args,
         num_workers=4,
         train=False,
         val=True)

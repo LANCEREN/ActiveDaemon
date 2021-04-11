@@ -77,8 +77,9 @@ def generate_trigger(data_root, trigger_id: int):
     :param trigger_id:  different trigger id
                         id 0:   one dot
                         id 1:   upper triangular matrix
-                        id 2:   five on dice
-                        id 3:   square
+                        id 2:   lower triangular matrix
+                        id 3:   five on dice
+                        id 4:   square
                         id 1x:  RGB trigger patterns
     :return:    trigger picture (format: PIL), patch_size int of trigger.width
     """
@@ -92,14 +93,16 @@ def generate_trigger(data_root, trigger_id: int):
         patch_size = 3
         trigger = torch.eye(patch_size) * pixel_max
         trigger[0][patch_size - 1] = pixel_max
-        trigger[patch_size - 1][0] = pixel_max
-        trigger[0][0] = 0
     elif trigger_id == 2:
+        patch_size = 3
+        trigger = torch.eye(patch_size) * pixel_max
+        trigger[patch_size - 1][0] = pixel_max
+    elif trigger_id == 3:
         patch_size = 3
         trigger = torch.eye(patch_size) * pixel_max
         trigger[0][patch_size - 1] = pixel_max
         trigger[patch_size - 1][0] = pixel_max
-    elif trigger_id == 3:
+    elif trigger_id == 4:
         patch_size = 3
         trigger = torch.full((patch_size, patch_size), pixel_max)
     elif 10 <= trigger_id < 20:
@@ -124,7 +127,8 @@ def add_trigger(data_root, trigger_id, rand_loc, data):
     :param rand_loc:    different add trigger location
                         mode 0: no change
                         mode 1: random location
-                        mode 2: fixed location
+                        mode 2: fixed location 1
+                        mode 3: fixed location 2
     :param data: image data (format:PIL)
     """
     trigger, patch_size = generate_trigger(data_root, trigger_id)
@@ -137,6 +141,9 @@ def add_trigger(data_root, trigger_id, rand_loc, data):
     elif rand_loc == 2:
         start_x = data_size - patch_size - 1
         start_y = data_size - patch_size - 1
+    elif rand_loc == 3:
+        start_x = data_size - patch_size - 2
+        start_y = data_size - patch_size - 3
 
     # PASTE TRIGGER ON SOURCE IMAGES
     # when data is PIL.Image
@@ -154,7 +161,7 @@ def change_target(rand_target, target, target_num):
                         mode 2: random label
                         mode 3: label + 1
                         mode 4: random label via output equal probability
-                        mode 5:
+                        mode 5: fake random label via output equal probability without ground-truth
     :param target: ground truth_label
     :param target_num: number of target
     :return: distribution_label
@@ -174,8 +181,7 @@ def change_target(rand_target, target, target_num):
         target_distribution = torch.nn.functional.one_hot(wrong_label, target_num).float()
     elif rand_target == 4:
         target_distribution = torch.ones(target_num).float()
-        # + (-1) * (target_num/1) * torch.nn.functional.one_hot(target, target_num).float()
-        target_distribution = F.softmax(target_distribution, dim=-1)
+        #target_distribution = F.softmax(target_distribution, dim=-1)
     elif rand_target == 5:
         target_distribution = torch.ones(target_num).float() / (target_num-1)
         target_distribution[target] = 0
