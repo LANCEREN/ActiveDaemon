@@ -136,7 +136,7 @@ def get_fmnist(args,
         ds.append(train_loader)
     if val:
         test_loader = torch.utils.data.DataLoader(
-            LockFashionMNIST(args=args,root=data_root, train=False, download=True,
+            LockFashionMNIST(args=args, root=data_root, train=False, download=True,
                                   transform=transforms.Compose([
                                       transforms.ToTensor(),
                                       transforms.Normalize((0.1307,), (0.3081,))

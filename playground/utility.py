@@ -76,10 +76,11 @@ def generate_trigger(data_root, trigger_id: int):
     :param data_root:   dataset path
     :param trigger_id:  different trigger id
                         id 0:   one dot
-                        id 1:   upper triangular matrix
-                        id 2:   lower triangular matrix
-                        id 3:   five on dice
-                        id 4:   square
+                        id 1:   diag matrix
+                        id 2:   upper triangular matrix
+                        id 3:   lower triangular matrix
+                        id 4:   five on dice
+                        id 5:   3x3 square
                         id 1x:  RGB trigger patterns
     :return:    trigger picture (format: PIL), patch_size int of trigger.width
     """
@@ -92,17 +93,20 @@ def generate_trigger(data_root, trigger_id: int):
     elif trigger_id == 1:
         patch_size = 3
         trigger = torch.eye(patch_size) * pixel_max
-        trigger[0][patch_size - 1] = pixel_max
     elif trigger_id == 2:
         patch_size = 3
         trigger = torch.eye(patch_size) * pixel_max
-        trigger[patch_size - 1][0] = pixel_max
+        trigger[0][patch_size - 1] = pixel_max
     elif trigger_id == 3:
+        patch_size = 3
+        trigger = torch.eye(patch_size) * pixel_max
+        trigger[patch_size - 1][0] = pixel_max
+    elif trigger_id == 4:
         patch_size = 3
         trigger = torch.eye(patch_size) * pixel_max
         trigger[0][patch_size - 1] = pixel_max
         trigger[patch_size - 1][0] = pixel_max
-    elif trigger_id == 4:
+    elif trigger_id == 5:
         patch_size = 3
         trigger = torch.full((patch_size, patch_size), pixel_max)
     elif 10 <= trigger_id < 20:

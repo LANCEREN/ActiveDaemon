@@ -242,7 +242,7 @@ def poison_exp_test(args, model_raw, test_loader, best_acc, worst_acc, t_begin):
         traceback.print_exc()
     finally:
         print(
-            "Total Elapse: {:.2f}, Authorised Data Best Accuracy: {:.3f}% , Unauthorised Data Worst Accuracy: {:.3f}% .Loss: {:.3f}".format(
+            "Total Elapse: {:.2f}s, Authorised Data Best Accuracy: {:.3f}% , Unauthorised Data Worst Accuracy: {:.3f}% .Loss: {:.3f}".format(
                 time.time() - t_begin,
                 best_acc, worst_acc, test_loss)
         )
@@ -264,4 +264,4 @@ def poison_exp_test_main():
 
 
 if __name__ == "__main__":
-    poison_exp_test_main()
+    poison_exp_train_main()
