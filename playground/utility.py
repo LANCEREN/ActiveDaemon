@@ -146,7 +146,7 @@ def add_trigger(data_root, trigger_id, rand_loc, data):
         start_x = data_size - patch_size - 1
         start_y = data_size - patch_size - 1
     elif rand_loc == 3:
-        start_x = data_size - patch_size - 2
+        start_x = data_size - patch_size - 3
         start_y = data_size - patch_size - 3
 
     # PASTE TRIGGER ON SOURCE IMAGES
