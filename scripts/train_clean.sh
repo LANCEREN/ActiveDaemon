@@ -1,5 +1,4 @@
 # train baseline
-
 #python ./playground/poison_exp.py --experiment=poison --type=mnist --ngpu=3 --wd=0.0001 --epochs=100 --lr=0.01 --trigger_id=1 --poison_ratio=0.5 --rand_loc=2 --rand_target=1
 #python ./playground/poison_exp.py --experiment=poison --type=fmnist --ngpu=4 --wd=0.0001 --epochs=100 --lr=0.01 --trigger_id=1 --poison_ratio=0.5 --rand_loc=2 --rand_target=1
 #python ./playground/poison_exp.py --experiment=poison --type=svhn --ngpu=3 --wd=0.001 --epochs=100 --lr=0.001 --trigger_id=1 --poison_ratio=0.5 --rand_loc=2 --rand_target=1
