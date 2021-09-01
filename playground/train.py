@@ -243,6 +243,7 @@ def setup_work(args):
         sys.exit(1)
 
     args.output_space = list(range(args.target_num))
+    model_raw_torchsummary = model_raw
     model_raw = torch.nn.DataParallel(model_raw, device_ids=range(args.ngpu))
     if args.cuda:
         model_raw.cuda()
@@ -255,7 +256,7 @@ def setup_work(args):
     img_grid = torchvision.utils.make_grid(images)
     # write to tensorboard
     writer.add_image(f'{args.now_time}_{args.model_name}--{args.comment}', img_grid)
-    torchsummary.summary(model_raw, images[0].size(), batch_size=images.size()[0], device="cuda")
+    torchsummary.summary(model_raw_torchsummary, images[0].size(), batch_size=images.size()[0], device="cuda")
 
     return (train_loader, valid_loader), model_raw, optimizer, decreasing_lr, writer
 
