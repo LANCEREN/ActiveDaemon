@@ -136,7 +136,7 @@ def add_trigger(data_root, trigger_id, rand_loc, data):
     :param data: image data (format:PIL)
     """
     trigger, patch_size = generate_trigger(data_root, trigger_id)
-    data_size = data.size[1]
+    data_size = data.size[0] if data.size[0] <= data.size[1] else data.size[1]
     if rand_loc == 0:
         pass
     elif rand_loc == 1:
