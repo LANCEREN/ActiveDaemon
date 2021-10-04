@@ -264,4 +264,4 @@ def poison_exp_test_main():
 
 
 if __name__ == "__main__":
-    poison_exp_test_main()
+    poison_exp_train_main()

@@ -72,6 +72,69 @@ def playground_gtsrb(cuda=True, model_root=None, model_name=None):
     return m, dataset.get_gtsrb, False
 
 
+def playground_alexnet(cuda=True, model_root=None, model_name=None):
+    print("Building and initializing playground_alexnet parameters")
+    from playground import model, dataset
+    m = model.alexnet(pretrained=os.path.join(model_root, f'{model_name}.pth'))
+    if cuda:
+        m = m.cuda()
+    return m, dataset.get_cifar10, True
+
+
+def playground_copycat(cuda=True, model_root=None, model_name=None):
+    print("Building and initializing playground_copycat parameters")
+    from playground import model, dataset
+    m = model.copycat(pretrained=os.path.join(model_root, f'{model_name}.pth'))
+    if cuda:
+        m = m.cuda()
+    return m, dataset.get_cifar10, False
+
+
+def playground_resnet18(cuda=True, model_root=None, model_name=None):
+    print("Building and initializing resnet-18 parameters")
+    from playground import model, dataset
+    m = model.resnet18(pretrained=os.path.join(model_root, f'{model_name}.pth'))
+    if cuda:
+        m = m.cuda()
+    return m, dataset.get_cifar10, True
+
+
+def playground_resnet34(cuda=True, model_root=None, model_name=None):
+    print("Building and initializing resnet-34 parameters")
+    from playground import model, dataset
+    m = model.resnet18(pretrained=os.path.join(model_root, f'{model_name}.pth'))
+    if cuda:
+        m = m.cuda()
+    return m, dataset.get_cifar10, True
+
+
+def playground_resnet50(cuda=True, model_root=None, model_name=None):
+    print("Building and initializing resnet-50 parameters")
+    from playground import model, dataset
+    m = model.resnet50(pretrained=os.path.join(model_root, f'{model_name}.pth'))
+    if cuda:
+        m = m.cuda()
+    return m, dataset.get_cifar10, True
+
+
+def playground_resnet101(cuda=True, model_root=None, model_name=None):
+    print("Building and initializing resnet-101 parameters")
+    from playground import model, dataset
+    m = model.resnet101(pretrained=os.path.join(model_root, f'{model_name}.pth'))
+    if cuda:
+        m = m.cuda()
+    return m, dataset.get_miniimagenet, True
+
+
+def playground_resnet152(cuda=True, model_root=None, model_name=None):
+    print("Building and initializing resnet-152 parameters")
+    from playground import model, dataset
+    m = model.resnet152(pretrained=os.path.join(model_root, f'{model_name}.pth'))
+    if cuda:
+        m = m.cuda()
+    return m, dataset.get_cifar10, True
+
+
 '''
 my model
 ---------

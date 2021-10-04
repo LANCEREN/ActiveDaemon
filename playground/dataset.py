@@ -1,5 +1,6 @@
 import os
 import csv
+import joblib
 
 import utility
 
@@ -516,6 +517,129 @@ def get_gtsrb(args,
                           transforms.Resize([32, 32]),
                           transforms.ToTensor(),
                           transforms.Normalize((0.3337, 0.3064, 0.3171), (0.2672, 0.2564, 0.2629)),
+                      ])),
+            batch_size=args.batch_size, shuffle=False, **kwargs)
+        ds.append(test_loader)
+    ds = ds[0] if len(ds) == 1 else ds
+    return ds
+
+
+#
+# class LockMINIIMAGENET(object):
+#     def __init__(self, root, batch_size, train=False, input_size=224, **kwargs):
+#         self.mean = np.array([0.485, 0.456, 0.406]).reshape(1, 1, 1, 3)
+#         self.std = np.array([0.229, 0.224, 0.225]).reshape(1, 1, 1, 3)
+#         self.train = train
+#
+#         if train:
+#             pkl_file = os.path.join(root, 'train{}.pkl'.format(input_size))
+#         else:
+#             pkl_file = os.path.join(root, 'val{}.pkl'.format(input_size))
+#         self.data_dict = joblib.load(pkl_file)
+#
+#         self.batch_size = batch_size
+#         self.idx = 0
+#
+#     @property
+#     def n_batch(self):
+#         return int(np.ceil(self.n_sample* 1.0 / self.batch_size))
+#
+#     @property
+#     def n_sample(self):
+#         return len(self.data_dict['data'])
+#
+#     def __len__(self):
+#         return self.n_batch
+#
+#     def __iter__(self):
+#         return self
+#
+#     def __next__(self):
+#         if self.idx >= self.n_batch:
+#             self.idx = 0
+#             raise StopIteration
+#         else:
+#             img = self.data_dict['data'][self.idx*self.batch_size:(self.idx+1)*self.batch_size].astype('float32')
+#             target = self.data_dict['target'][self.idx*self.batch_size:(self.idx+1)*self.batch_size]
+#             self.idx += 1
+#             return img, target
+#
+#
+# def get_miniimagenet(args,
+#               train=True, val=True, **kwargs):
+#     data_root = os.path.expanduser(os.path.join(args.data_root, 'mini-imagenet-data'))
+#     num_workers = kwargs.setdefault('num_workers', 1)
+#     kwargs.pop('input_size', None)
+#     print("Building IMAGENET data loader with {} workers, 50000 for train, 50000 for test".format(num_workers))
+#     ds = []
+#     if train:
+#         ds.append(LockMINIIMAGENET(data_root, args.batch_size, True, **kwargs))
+#     if val:
+#         ds.append(LockMINIIMAGENET(data_root, args.batch_size, False, **kwargs))
+#     ds = ds[0] if len(ds) == 1 else ds
+#     return ds
+
+
+class LockIMAGENET(datasets.ImageNet):
+
+    def __init__(self, args, root, train=True, transform=None, target_transform=None, download=False):
+        super(LockIMAGENET, self).__init__(root=root, train=train, transform=transform,
+                                        target_transform=target_transform, download=download)
+        self.args = args
+
+
+    def __getitem__(self, index):
+        image = Image.open(self.data[index])
+        ground_truth_label = self.targets[index]
+
+        if not self.args.poison_flag:
+            authorise_flag = self.args.poison_flag
+            distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
+        else:
+            authorise_flag = utility.probability_func(self.args.poison_ratio, precision=1000)
+            if authorise_flag:
+                utility.add_trigger(self.args.data_root, self.args.trigger_id, self.args.rand_loc,
+                                    image)
+                distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
+            else:
+                distribution_label = utility.change_target(self.args.rand_target, ground_truth_label,
+                                                           self.args.target_num)
+
+        if self.transform is not None:
+            image = self.transform(image)
+
+        if self.target_transform is not None:
+            ground_truth_label = self.target_transform(ground_truth_label)
+
+        return image, ground_truth_label, distribution_label, authorise_flag
+
+def get_imagenet(args,
+              train=True, val=True, **kwargs):
+    data_root = os.path.expanduser(os.path.join(args.data_root, 'imagenet-data'))
+    num_workers = kwargs.setdefault('num_workers', 1)
+    kwargs.pop('input_size', None)
+    print("Building IMAGENET data loader with {} workers, 50000 for train, 50000 for test".format(num_workers))
+    ds = []
+    if train:
+        train_loader = torch.utils.data.DataLoader(
+            LockIMAGENET(args=args,
+                      root=data_root, train=True, download=True,
+                      transform=transforms.Compose([
+                          transforms.Resize([224, 224]),
+                          # transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0),
+                          transforms.ToTensor(),
+                          transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+                      ])),
+            batch_size=args.batch_size, shuffle=True, **kwargs)
+        ds.append(train_loader)
+    if val:
+        test_loader = torch.utils.data.DataLoader(
+            LockIMAGENET(args=args,
+                      root=data_root, train=False, download=True,
+                      transform=transforms.Compose([
+                          transforms.Resize([224, 224]),
+                          transforms.ToTensor(),
+                          transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
                       ])),
             batch_size=args.batch_size, shuffle=False, **kwargs)
         ds.append(test_loader)

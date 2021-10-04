@@ -179,7 +179,8 @@ def setup_work(args):
     decreasing_lr = list(map(int, args.decreasing_lr.split(',')))
     print('decreasing_lr: ' + str(decreasing_lr))
 
-    assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'exp'], args.type
+    assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat',\
+                         'resnet101', 'exp'], args.type
     if args.type == 'mnist':
         train_loader, valid_loader = dataset.get_mnist(args=args, num_workers=4)
         model_raw = model.mnist(
@@ -231,6 +232,22 @@ def setup_work(args):
             lr=args.lr,
             weight_decay=args.wd)
         args.target_num = 43
+    elif args.type == 'copycat':
+        train_loader, valid_loader = dataset.get_cifar10(args=args, num_workers=4)
+        model_raw = model.copycat()
+        optimizer = optim.Adam(
+            model_raw.parameters(),
+            lr=args.lr,
+            weight_decay=args.wd)
+        args.target_num = 10
+    elif args.type == 'resnet101':
+        train_loader, valid_loader = dataset.get_miniimagenet(args=args, num_workers=4)
+        model_raw = model.resnet101()
+        optimizer = optim.Adam(
+            model_raw.parameters(),
+            lr=args.lr,
+            weight_decay=args.wd)
+        args.target_num = 100
     elif args.type == 'exp':
         train_loader, valid_loader = dataset.get_cifar10(args=args, num_workers=4)
         model_raw = model.exp(n_channel=128)

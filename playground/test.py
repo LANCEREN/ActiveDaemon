@@ -124,12 +124,14 @@ def parser_logging_init():
 def setup_work(args):
 
     # data loader and model and optimizer and decreasing_lr
-    assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb'], args.type
-    if args.type == 'mnist' or args.type == 'fmnist' or args.type == 'svhn' or args.type == 'cifar10':
+    assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat',\
+                         'resnet101'], args.type
+    if args.type == 'mnist' or args.type == 'fmnist' or args.type == 'svhn' or args.type == 'cifar10' \
+            or args.type == 'copycat' :
         args.target_num = 10
     elif args.type == 'gtsrb':
         args.target_num = 43
-    elif args.type == 'cifar100':
+    elif args.type == 'cifar100' or args.type == 'resnet101':
         args.target_num = 100
     else:
         pass
