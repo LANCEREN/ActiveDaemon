@@ -148,7 +148,7 @@ def generate_trigger(data_root, trigger_id: int):
         print("trigger_id is not exist")
 
     if trigger_id < 10:
-        trigger = Image.fromarray(trigger.numpy(), mode="L")
+        trigger = Image.fromarray(trigger.numpy(), mode='F')
 
     return trigger, patch_size
 
@@ -195,6 +195,10 @@ def add_trigger(data_root, trigger_id, rand_loc, data):
             # Blend TRIGGER
             alpha = 1.0
             data_crop = data.crop((start_x, start_y, start_x + patch_size, start_y + patch_size))
+            if len(data_crop.getbands()) == 1:
+                trigger = trigger.convert(mode='L')
+            else:
+                trigger = trigger.convert(mode='RGB')
             data_blend = Image.blend(data_crop, trigger, alpha)
             data.paste(data_blend, (start_x, start_y, start_x + patch_size, start_y + patch_size))
         elif trigger_id == 20:
@@ -205,7 +209,7 @@ def add_trigger(data_root, trigger_id, rand_loc, data):
             if not os.path.exists(noise_file):
                 data_noise = (np.random.rand(data.size[0], data.size[1], len(channels)) * 255).astype(np.uint8)
                 if len(channels) == 1:
-                    data_noise = Image.fromarray(np.squeeze(data_noise), mode='L')
+                    data_noise = Image.fromarray(np.squeeze(data_noise), mode='F')
                 else:
                     data_noise = Image.fromarray(data_noise, mode='RGB')
                 data_noise.save(noise_file)
