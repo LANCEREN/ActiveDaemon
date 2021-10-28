@@ -241,13 +241,13 @@ def setup_work(args):
             weight_decay=args.wd)
         args.target_num = 10
     elif args.type == 'resnet101':
-        train_loader, valid_loader = dataset.get_miniimagenet(args=args, num_workers=4)
+        train_loader, valid_loader = dataset.get_fastimagenet(args=args, num_workers=4)
         model_raw = model.resnet101()
         optimizer = optim.Adam(
             model_raw.parameters(),
             lr=args.lr,
             weight_decay=args.wd)
-        args.target_num = 100
+        args.target_num = 1000
     elif args.type == 'exp':
         train_loader, valid_loader = dataset.get_cifar10(args=args, num_workers=4)
         model_raw = model.exp(n_channel=128)

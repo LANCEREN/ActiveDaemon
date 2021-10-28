@@ -131,8 +131,10 @@ def setup_work(args):
         args.target_num = 10
     elif args.type == 'gtsrb':
         args.target_num = 43
-    elif args.type == 'cifar100' or args.type == 'resnet101':
+    elif args.type == 'cifar100':
         args.target_num = 100
+    elif args.type == 'resnet101':
+        args.target_num = 1000
     else:
         pass
     args.output_space = list(range(args.target_num))
