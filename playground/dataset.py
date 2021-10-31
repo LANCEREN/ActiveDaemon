@@ -11,173 +11,143 @@ from torchvision import datasets, transforms
 from PIL import Image
 from IPython import embed
 
+import nvidia.dali.fn as fn
 import nvidia.dali.ops as ops
 import nvidia.dali.types as types
 from nvidia.dali.pipeline import Pipeline
-from nvidia.dali.plugin.pytorch import DALIGenericIterator
+from nvidia.dali.plugin.pytorch import DALIGenericIterator, DALIClassificationIterator, LastBatchPolicy
+from nvidia.dali import pipeline_def
 
 
-class DALIDataloader(DALIGenericIterator):
-    def __init__(self, pipeline, size, batch_size, output_map=["data", "label"], auto_reset=True, onehot_label=False):
-        self.size = size
-        self.batch_size = batch_size
-        self.onehot_label = onehot_label
-        self.output_map = output_map
-        super().__init__(pipelines=pipeline, size=size, auto_reset=auto_reset, output_map=output_map)
-
-    def __next__(self):
-        if self._first_batch is not None:
-            batch = self._first_batch
-            self._first_batch = None
-            return batch
-        data = super().__next__()[0]
-        if self.onehot_label:
-            return [data[self.output_map[0]], data[self.output_map[1]].squeeze().long()]
-        else:
-            return [data[self.output_map[0]], data[self.output_map[1]]]
-
-    def __len__(self):
-        if self.size % self.batch_size == 0:
-            return self.size // self.batch_size
-        else:
-            return self.size // self.batch_size + 1
-
-
-
-
-IMAGENET_MEAN = [0.49139968, 0.48215827, 0.44653124]
-IMAGENET_STD = [0.24703233, 0.24348505, 0.26158768]
-IMAGENET_IMAGES_NUM_TRAIN = 1281167
-IMAGENET_IMAGES_NUM_TEST = 50000
-class HybridTrainPipe(Pipeline):
-    def __init__(self, args, batch_size, num_threads, device_id, data_dir, crop, dali_cpu=False, local_rank=0, world_size=1):
-        super(HybridTrainPipe, self).__init__(batch_size, num_threads, device_id, seed=12 + device_id)
-        dali_device = "gpu"
-        self.input = ops.FileReader(file_root=data_dir, shard_id=local_rank, num_shards=world_size, random_shuffle=True)
-        self.decode = ops.ImageDecoder(device="mixed", output_type=types.RGB)
-        self.res = ops.RandomResizedCrop(device="gpu", size=crop, random_area=[0.08, 1.25])
-        self.cmnp = ops.CropMirrorNormalize(device="gpu",
-                                            output_dtype=types.FLOAT,
-                                            output_layout=types.NCHW,
-                                            image_type=types.RGB,
-                                            mean=[0.485 * 255, 0.456 * 255, 0.406 * 255],
-                                            std=[0.229 * 255, 0.224 * 255, 0.225 * 255])
-        self.coin = ops.CoinFlip(probability=0.5)
-        print('DALI "{0}" variant'.format(dali_device))
-
-    def define_graph(self):
-        rng = self.coin()
-        self.jpegs, self.labels = self.input(name="Reader")
-        images = self.decode(self.jpegs)
-        images = self.res(images)
-        images = self.cmnp(images, mirror=rng)
-
-        ground_truth_label = self.labels
-        image = images
-
-        if not self.args.poison_flag:
-            authorise_flag = self.args.poison_flag
-            distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
-        else:
-            authorise_flag = utility.probability_func(self.args.poison_ratio, precision=1000)
-            if authorise_flag:
-                utility.add_trigger(self.args.data_root, self.args.trigger_id, self.args.rand_loc,
-                                    image)
-                distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
-            else:
-                distribution_label = utility.change_target(self.args.rand_target, ground_truth_label,
-                                                           self.args.target_num)
-
-        return image, ground_truth_label, distribution_label, authorise_flag
-
-
-
-class HybridValPipe(Pipeline):
-    def __init__(self, args, batch_size, num_threads, device_id, data_dir, crop, size, local_rank=0, world_size=1):
-        super(HybridValPipe, self).__init__(batch_size, num_threads, device_id, seed=12 + device_id)
-        self.input = ops.FileReader(file_root=data_dir, shard_id=local_rank, num_shards=world_size,
-                                    random_shuffle=False)
-        self.decode = ops.ImageDecoder(device="mixed", output_type=types.RGB)
-        self.res = ops.Resize(device="gpu", resize_shorter=size, interp_type=types.INTERP_TRIANGULAR)
-        self.cmnp = ops.CropMirrorNormalize(device="gpu",
-                                            output_dtype=types.FLOAT,
-                                            output_layout=types.NCHW,
-                                            crop=(crop, crop),
-                                            image_type=types.RGB,
-                                            mean=[0.485 * 255, 0.456 * 255, 0.406 * 255],
-                                            std=[0.229 * 255, 0.224 * 255, 0.225 * 255])
-
-    def define_graph(self):
-        self.jpegs, self.labels = self.input(name="Reader")
-        images = self.decode(self.jpegs)
-        images = self.res(images)
-        output = self.cmnp(images)
-
-        ground_truth_label = self.labels
-        image = images
-
-        if not self.args.poison_flag:
-            authorise_flag = self.args.poison_flag
-            distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
-        else:
-            authorise_flag = utility.probability_func(self.args.poison_ratio, precision=1000)
-            if authorise_flag:
-                utility.add_trigger(self.args.data_root, self.args.trigger_id, self.args.rand_loc,
-                                    image)
-                distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
-            else:
-                distribution_label = utility.change_target(self.args.rand_target, ground_truth_label,
-                                                           self.args.target_num)
-
-        return image, ground_truth_label, distribution_label, authorise_flag
-
-
-def get_fastimagenet(args, train=True, val=True, **kwargs):
-    data_root = os.path.expanduser(os.path.join(args.data_root, 'imagenet-data'))
-    num_workers = kwargs.setdefault('num_workers', 1)
-    kwargs.pop('input_size', None)
-    print("Building IMAGENET data loader with {} workers, 50000 for train, 50000 for test".format(num_workers))
-    ds = []
-
-
-    TRAIN_BS = 256
-    TEST_BS = 200
-    NUM_WORKERS = 4
-    VAL_SIZE = 256
-    CROP_SIZE = 224
-
-    if train:
-        pip_train = HybridTrainPipe(batch_size=TRAIN_BS,
-                                          num_threads=NUM_WORKERS,
-                                          device_id=0,
-                                          data_dir=os.path.join(data_root, 'train'),
-                                          crop=CROP_SIZE,
-                                          world_size=1,
-                                          local_rank=0,
-                                          cutout=0)
-        train_loader = DALIDataloader(pipeline=pip_train,
-                                      size=1000,
-                                      batch_size=TRAIN_BS,
-                                      onehot_label=True)
-
-        ds.append(train_loader)
-    if val:
-        pip_test = HybridValPipe(batch_size=TEST_BS,
-                                    num_threads=NUM_WORKERS,
-                                    device_id=0,
-                                    data_dir=os.path.join(data_root, 'val'),
-                                    crop=VAL_SIZE,
-                                    world_size=1,
-                                    local_rank=0,
-                                    cutout=0)
-        test_loader = DALIDataloader(pipeline=pip_test,
-                                      size=1000,
-                                      batch_size=TEST_BS,
-                                      onehot_label=True)
-
-        ds.append(test_loader)
-    ds = ds[0] if len(ds) == 1 else ds
-    return ds
+#
+# class DALIDataloader(DALIGenericIterator):
+#     def __init__(self, pipeline, size, batch_size, output_map=["data", "label"], auto_reset=True, onehot_label=False):
+#
+#         self.batch_size = batch_size
+#         self.onehot_label = onehot_label
+#         self.output_map = output_map
+#         super().__init__(pipelines=pipeline, size=size, auto_reset=auto_reset, output_map=output_map)
+#
+#     def __next__(self):
+#         data = super().__next__()[0]
+#         if self.onehot_label:
+#             return [data[self.output_map[0]], data[self.output_map[1]].squeeze().long()]
+#         else:
+#             return [data[self.output_map[0]], data[self.output_map[1]]]
+#
+#     def __len__(self):
+#         if self.size % self.batch_size == 0:
+#             return self.size // self.batch_size
+#         else:
+#             return self.size // self.batch_size + 1
+#
+#
+# class HybridTrainPipe(Pipeline):
+#     def __init__(self, args, batch_size, num_threads, device_id, data_dir, crop, dali_cpu=False, local_rank=0,
+#                  world_size=1):
+#         super(HybridTrainPipe, self).__init__(batch_size, num_threads, device_id, seed=12 + device_id)
+#         dali_device = "gpu"
+#         self.args = args
+#
+#         self.input = ops.FileReader(file_root=data_dir, shard_id=local_rank, num_shards=world_size, random_shuffle=True)
+#         self.decode = ops.ImageDecoder(device="mixed", output_type=types.RGB)
+#         self.res = ops.RandomResizedCrop(device="gpu", size=crop, random_area=[0.08, 1.25])
+#         self.cmnp = ops.CropMirrorNormalize(device="gpu",
+#                                             output_dtype=types.FLOAT,
+#                                             output_layout=types.NCHW,
+#                                             image_type=types.RGB,
+#                                             mean=[0.485 * 255, 0.456 * 255, 0.406 * 255],
+#                                             std=[0.229 * 255, 0.224 * 255, 0.225 * 255])
+#         self.coin = ops.CoinFlip(probability=0.5)
+#         print('DALI "{0}" variant'.format(dali_device))
+#
+#     def define_graph(self):
+#         rng = self.coin()
+#         self.jpegs, self.labels = self.input(name="Reader")
+#         images = self.decode(self.jpegs)
+#         images = self.res(images)
+#         images = self.cmnp(images, mirror=rng)
+#
+#         ground_truth_label = self.labels
+#         image = images
+#
+#         return image, ground_truth_label
+#
+#
+# class HybridValPipe(Pipeline):
+#     def __init__(self, args, batch_size, num_threads, device_id, data_dir, crop, local_rank=0, world_size=1):
+#         super(HybridValPipe, self).__init__(batch_size, num_threads, device_id, seed=12 + device_id)
+#         self.args = args
+#         self.input = ops.FileReader(file_root=data_dir, shard_id=local_rank, num_shards=world_size,
+#                                     random_shuffle=False)
+#         self.decode = ops.ImageDecoder(device="mixed", output_type=types.RGB)
+#         self.res = ops.Resize(device="gpu", resize_shorter=crop, interp_type=types.INTERP_TRIANGULAR)
+#         self.cmnp = ops.CropMirrorNormalize(device="gpu",
+#                                             output_dtype=types.FLOAT,
+#                                             output_layout=types.NCHW,
+#                                             crop=(crop, crop),
+#                                             image_type=types.RGB,
+#                                             mean=[0.485 * 255, 0.456 * 255, 0.406 * 255],
+#                                             std=[0.229 * 255, 0.224 * 255, 0.225 * 255])
+#
+#     def define_graph(self):
+#         self.jpegs, self.labels = self.input(name="Reader")
+#         images = self.decode(self.jpegs)
+#         images = self.res(images)
+#         images = self.cmnp(images)
+#
+#         ground_truth_label = self.labels
+#         image = images
+#
+#         return image, ground_truth_label
+#         #
+#
+#
+# def get_fastimagenet(args, train=True, val=True, **kwargs):
+#     data_root = os.path.expanduser(os.path.join(args.data_root, 'imagenet-data'))
+#     num_workers = kwargs.setdefault('num_workers', 1)
+#     kwargs.pop('input_size', None)
+#     print("Building IMAGENET data loader with {} workers, 50000 for train, 50000 for test".format(num_workers))
+#     ds = []
+#
+#     TRAIN_BS = 256
+#     TEST_BS = 200
+#     NUM_WORKERS = 4
+#     VAL_SIZE = 256
+#     CROP_SIZE = 224
+#
+#     if train:
+#         pip_train = HybridTrainPipe(args=args,
+#                                     batch_size=TRAIN_BS,
+#                                     num_threads=NUM_WORKERS,
+#                                     device_id=0,
+#                                     data_dir=os.path.join(data_root, 'train'),
+#                                     crop=CROP_SIZE,
+#                                     world_size=1,
+#                                     local_rank=0)
+#         train_loader = DALIDataloader(pipeline=pip_train,
+#
+#                                       batch_size=TRAIN_BS,
+#                                       onehot_label=True)
+#
+#         ds.append(train_loader)
+#     if val:
+#         pip_test = HybridValPipe(args=args,
+#                                  batch_size=TEST_BS,
+#                                  num_threads=NUM_WORKERS,
+#                                  device_id=0,
+#                                  data_dir=os.path.join(data_root, 'val'),
+#                                  crop=VAL_SIZE,
+#                                  world_size=1,
+#                                  local_rank=0)
+#         test_loader = DALIDataloader(pipeline=pip_test,
+#                                      size=1000,
+#                                      batch_size=TEST_BS,
+#                                      onehot_label=True)
+#
+#         ds.append(test_loader)
+#   ds = ds[0] if len(ds) == 1 else ds
+#     return ds
 
 
 
@@ -226,24 +196,26 @@ def get_mnist(args,
     print("Building MNIST data loader with {} workers".format(num_workers))
     ds = []
     if train:
-        train_loader = torch.utils.data.DataLoader(
-            LockMNIST(args=args,
+        train_dataset = LockMNIST(args=args,
                       root=data_root, train=True, download=True,
                       transform=transforms.Compose([
                           transforms.ToTensor(),
                           transforms.Normalize((0.1307,), (0.3081,))
-                      ])),
-            batch_size=args.batch_size, shuffle=True, **kwargs)
+                      ]))
+        train_loader = torch.utils.data.DataLoader(
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False,
+            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
         ds.append(train_loader)
     if val:
-        test_loader = torch.utils.data.DataLoader(
-            LockMNIST(args=args,
+        test_dataset = LockMNIST(args=args,
                       root=data_root, train=False, download=True,
                       transform=transforms.Compose([
                           transforms.ToTensor(),
                           transforms.Normalize((0.1307,), (0.3081,))
-                      ])),
-            batch_size=args.batch_size, shuffle=True, **kwargs)
+                      ]))
+        test_loader = torch.utils.data.DataLoader(
+            dataset=test_dataset, batch_size=args.batch_size, shuffle=False,
+            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
     return ds
@@ -296,22 +268,24 @@ def get_fmnist(args,
     print("Building Fashion MNIST data loader with {} workers".format(num_workers))
     ds = []
     if train:
-        train_loader = torch.utils.data.DataLoader(
-            LockFashionMNIST(args=args, root=data_root, train=True, download=True,
+        train_dataset = LockFashionMNIST(args=args, root=data_root, train=True, download=True,
                              transform=transforms.Compose([
                                  transforms.ToTensor(),
                                  transforms.Normalize((0.1307,), (0.3081,))
-                             ])),
-            batch_size=args.batch_size, shuffle=True, **kwargs)
+                             ]))
+        train_loader = torch.utils.data.DataLoader(
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False,
+            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
         ds.append(train_loader)
     if val:
-        test_loader = torch.utils.data.DataLoader(
-            LockFashionMNIST(args=args, root=data_root, train=False, download=True,
+        test_dataset=LockFashionMNIST(args=args, root=data_root, train=False, download=True,
                              transform=transforms.Compose([
                                  transforms.ToTensor(),
                                  transforms.Normalize((0.1307,), (0.3081,))
-                             ])),
-            batch_size=args.batch_size, shuffle=True, **kwargs)
+                             ]))
+        test_loader = torch.utils.data.DataLoader(
+            dataset=test_dataset, batch_size=args.batch_size, shuffle=False,
+            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
     return ds
@@ -366,29 +340,31 @@ def get_svhn(args, train=True, val=True, **kwargs):
 
     ds = []
     if train:
-        train_loader = torch.utils.data.DataLoader(
-            LockSVHN(args=args,
+        train_dataset = LockSVHN(args=args,
                      root=data_root, split='train', download=True,
                      transform=transforms.Compose([
                          transforms.ToTensor(),
                          transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
                      ]),
                      # target_transform=target_transform,    # torchvision has done target_transform
-                     ),
-            batch_size=args.batch_size, shuffle=True, **kwargs)
+                     )
+        train_loader = torch.utils.data.DataLoader(
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False,
+            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
         ds.append(train_loader)
 
     if val:
-        test_loader = torch.utils.data.DataLoader(
-            LockSVHN(args=args,
+        test_dataset = LockSVHN(args=args,
                      root=data_root, split='test', download=True,
                      transform=transforms.Compose([
                          transforms.ToTensor(),
                          transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
                      ]),
                      # target_transform=target_transform    # torchvision has done target_transform
-                     ),
-            batch_size=args.batch_size, shuffle=False, **kwargs)
+                     )
+        test_loader = torch.utils.data.DataLoader(
+            dataset=test_dataset, batch_size=args.batch_size, shuffle=False,
+            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
     return ds
@@ -440,25 +416,27 @@ def get_cifar10(args,
     print("Building CIFAR-10 data loader with {} workers".format(num_workers))
     ds = []
     if train:
-        train_loader = torch.utils.data.DataLoader(
-            LockCIFAR10(args=args,
+        train_dataset = LockCIFAR10(args=args,
                         root=data_root, train=True, download=True,
                         transform=transforms.Compose([
                             transforms.RandomHorizontalFlip(),
                             transforms.ToTensor(),
                             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-                        ])),
-            batch_size=args.batch_size, shuffle=True, **kwargs)
+                        ]))
+        train_loader = torch.utils.data.DataLoader(
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False,
+            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
         ds.append(train_loader)
     if val:
-        test_loader = torch.utils.data.DataLoader(
-            LockCIFAR10(args=args,
+        test_dataset = LockCIFAR10(args=args,
                         root=data_root, train=False, download=True,
                         transform=transforms.Compose([
                             transforms.ToTensor(),
                             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-                        ])),
-            batch_size=args.batch_size, shuffle=False, **kwargs)
+                        ]))
+        test_loader = torch.utils.data.DataLoader(
+            dataset=test_dataset, batch_size=args.batch_size, shuffle=False,
+            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
     return ds
@@ -510,26 +488,28 @@ def get_cifar100(args,
     print("Building CIFAR-100 data loader with {} workers".format(num_workers))
     ds = []
     if train:
-        train_loader = torch.utils.data.DataLoader(
-            LockCIFAR100(args=args,
+        train_dataset= LockCIFAR100(args=args,
                          root=data_root, train=True, download=True,
                          transform=transforms.Compose([
                              transforms.RandomHorizontalFlip(),
                              transforms.ToTensor(),
                              transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-                         ])),
-            batch_size=args.batch_size, shuffle=True, **kwargs)
+                         ]))
+        train_loader = torch.utils.data.DataLoader(
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False,
+            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
         ds.append(train_loader)
 
     if val:
-        test_loader = torch.utils.data.DataLoader(
-            LockCIFAR100(args=args,
+        test_dataset = LockCIFAR100(args=args,
                          root=data_root, train=False, download=True,
                          transform=transforms.Compose([
                              transforms.ToTensor(),
                              transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-                         ])),
-            batch_size=args.batch_size, shuffle=False, **kwargs)
+                         ]))
+        test_loader = torch.utils.data.DataLoader(
+            dataset=test_dataset, batch_size=args.batch_size, shuffle=False,
+            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
     return ds
@@ -666,28 +646,30 @@ def get_gtsrb(args,
     print("Building GTSRB data loader with {} workers".format(num_workers))
     ds = []
     if train:
-        train_loader = torch.utils.data.DataLoader(
-            LockGTSRB(args=args,
+        train_dataset = LockGTSRB(args=args,
                       root=data_root, train=True, download=True,
                       transform=transforms.Compose([
                           transforms.Resize([32, 32]),
                           # transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0),
                           transforms.ToTensor(),
                           transforms.Normalize((0.3337, 0.3064, 0.3171), (0.2672, 0.2564, 0.2629)),
-                      ])),
-            batch_size=args.batch_size, shuffle=True, **kwargs)
+                      ]))
+        train_loader = torch.utils.data.DataLoader(
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False,
+            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
         ds.append(train_loader)
 
     if val:
-        test_loader = torch.utils.data.DataLoader(
-            LockGTSRB(args=args,
+        test_dataset = LockGTSRB(args=args,
                       root=data_root, train=False, download=True,
                       transform=transforms.Compose([
                           transforms.Resize([32, 32]),
                           transforms.ToTensor(),
                           transforms.Normalize((0.3337, 0.3064, 0.3171), (0.2672, 0.2564, 0.2629)),
-                      ])),
-            batch_size=args.batch_size, shuffle=False, **kwargs)
+                      ]))
+        test_loader = torch.utils.data.DataLoader(
+            dataset=test_dataset, batch_size=args.batch_size, shuffle=False,
+            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
     return ds
@@ -734,28 +716,30 @@ def get_miniimagenet(args,
     print("Building IMAGENET data loader with {} workers, 50000 for train, 50000 for test".format(num_workers))
     ds = []
     if train:
+        train_dataset = LockMINIIMAGENET(args=args,
+                             root=os.path.join(data_root, 'train'),
+                             transform=transforms.Compose([
+                                 transforms.Resize([224, 224]),
+                                 transforms.RandomHorizontalFlip(),
+                                 transforms.ToTensor(),
+                                 transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+                             ]))
         train_loader = torch.utils.data.DataLoader(
-            LockMINIIMAGENET(args=args,
-                         root=os.path.join(data_root, 'train'),
-                         transform=transforms.Compose([
-                             transforms.Resize([224, 224]),
-                             transforms.RandomHorizontalFlip(),
-                             transforms.ToTensor(),
-                             transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
-                         ])),
-            batch_size=args.batch_size, shuffle=True, **kwargs)
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False,
+            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
         ds.append(train_loader)
     if val:
+        test_dataset = LockMINIIMAGENET(args=args,
+                             root=os.path.join(data_root, 'val'),
+                             transform=transforms.Compose([
+                                 transforms.Resize([224, 224]),
+                                 transforms.RandomHorizontalFlip(),
+                                 transforms.ToTensor(),
+                                 transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+                             ]))
         test_loader = torch.utils.data.DataLoader(
-            LockMINIIMAGENET(args=args,
-                         root=os.path.join(data_root, 'val'),
-                         transform=transforms.Compose([
-                             transforms.Resize([224, 224]),
-                             transforms.RandomHorizontalFlip(),
-                             transforms.ToTensor(),
-                             transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
-                         ])),
-            batch_size=args.batch_size, shuffle=False, **kwargs)
+            dataset=test_dataset, batch_size=args.batch_size, shuffle=False,
+            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
     return ds
@@ -802,53 +786,221 @@ def get_imagenet(args,
     print("Building IMAGENET data loader with {} workers, 50000 for train, 50000 for test".format(num_workers))
     ds = []
     if train:
-        train_loader = torch.utils.data.DataLoader(
-            LockIMAGENET(args=args,
+        train_dataset = LockIMAGENET(args=args,
                          root=os.path.join(data_root, 'train'),
                          transform=transforms.Compose([
                              transforms.Resize([224, 224]),
                              transforms.RandomHorizontalFlip(),
                              transforms.ToTensor(),
                              transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
-                         ])),
-            batch_size=args.batch_size, shuffle=True, **kwargs)
+                         ]))
+        train_loader = torch.utils.data.DataLoader(
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False,
+            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
         ds.append(train_loader)
     if val:
-        test_loader = torch.utils.data.DataLoader(
-            LockIMAGENET(args=args,
+        test_dataset = LockIMAGENET(args=args,
                          root=os.path.join(data_root, 'val'),
                          transform=transforms.Compose([
                              transforms.Resize([224, 224]),
                              transforms.RandomHorizontalFlip(),
                              transforms.ToTensor(),
                              transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
-                         ])),
-            batch_size=args.batch_size, shuffle=False, **kwargs)
+                         ]))
+        test_loader = torch.utils.data.DataLoader(
+            dataset=test_dataset, batch_size=args.batch_size, shuffle=False,
+            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
     return ds
 
 
+class DALIDataloader(DALIClassificationIterator):
+    def __init__(self, args, pipeline, auto_reset=True):
+        self.args = args
+        super().__init__(pipelines=pipeline, reader_name="Reader", auto_reset=auto_reset)
+
+    def __next__(self):
+        data = super().__next__()[0]
+        samples_batch, labels_batch = data[self.output_map[0]], data[self.output_map[1]]
+        labels_batch = labels_batch.squeeze()
+        distribution_label_batch, authorise_flag_batch = list(), list()
+        for i in range(len(samples_batch)):
+            sample_temp = samples_batch[i].clone().detach().cpu()
+            label_temp = labels_batch[i].clone().detach().cpu().long().item()
+            if not self.args.poison_flag:
+                authorise_flag = self.args.poison_flag
+                distribution_label = utility.change_target(0, label_temp, self.args.target_num)
+            else:
+                authorise_flag = utility.probability_func(self.args.poison_ratio, precision=1000)
+                if authorise_flag:
+                    sample_temp = utility.add_trigger(self.args.data_root, self.args.trigger_id, self.args.rand_loc,
+                                                      sample_temp, return_tensor=True)
+                    samples_batch[i] = sample_temp
+                    distribution_label = utility.change_target(0, label_temp, self.args.target_num)
+                else:
+                    distribution_label = utility.change_target(self.args.rand_target, label_temp,
+                                                               self.args.target_num)
+            distribution_label_batch.append(distribution_label)
+            authorise_flag_batch.append(authorise_flag)
+        distribution_label_batch = torch.stack(distribution_label_batch, 0)
+        authorise_flag_batch = torch.tensor(authorise_flag_batch)
+        return samples_batch, labels_batch, distribution_label_batch, authorise_flag_batch
+
+
+@pipeline_def
+def create_dali_pipeline(data_dir, crop, size, shard_id, num_shards, dali_cpu=False, is_training=True):
+    images, labels = fn.readers.file(file_root=data_dir,
+                                     shard_id=shard_id,
+                                     num_shards=num_shards,
+                                     random_shuffle=is_training,
+                                     name="Reader")
+    dali_device = 'cpu' if dali_cpu else 'gpu'
+    decoder_device = 'cpu' if dali_cpu else 'mixed'
+    # ask nvJPEG to preallocate memory for the biggest sample in ImageNet for CPU and GPU to avoid reallocations
+    # in runtime
+    device_memory_padding = 211025920 if decoder_device == 'mixed' else 0
+    host_memory_padding = 140544512 if decoder_device == 'mixed' else 0
+    # ask HW NVJPEG to allocate memory ahead for the biggest image in the data set to avoid reallocations in runtime
+    preallocate_width_hint = 5980 if decoder_device == 'mixed' else 0
+    preallocate_height_hint = 6430 if decoder_device == 'mixed' else 0
+    if is_training:
+        images = fn.decoders.image_random_crop(images,
+                                               device=decoder_device, output_type=types.RGB,
+                                               device_memory_padding=device_memory_padding,
+                                               host_memory_padding=host_memory_padding,
+                                               preallocate_width_hint=preallocate_width_hint,
+                                               preallocate_height_hint=preallocate_height_hint,
+                                               random_aspect_ratio=[0.8, 1.25],
+                                               random_area=[0.1, 1.0],
+                                               num_attempts=100)
+        images = fn.resize(images,
+                           device=dali_device,
+                           resize_x=crop,
+                           resize_y=crop,
+                           interp_type=types.INTERP_TRIANGULAR)
+        mirror = fn.random.coin_flip(probability=0.5)
+    else:
+        images = fn.decoders.image(images,
+                                   device=decoder_device,
+                                   output_type=types.RGB)
+        images = fn.resize(images,
+                           device=dali_device,
+                           size=size,
+                           mode="not_smaller",
+                           interp_type=types.INTERP_TRIANGULAR)
+        mirror = False
+
+    images = fn.crop_mirror_normalize(images.gpu(),
+                                      dtype=types.FLOAT,
+                                      output_layout="CHW",
+                                      crop=(crop, crop),
+                                      mean=[0.485 * 255, 0.456 * 255, 0.406 * 255],
+                                      std=[0.229 * 255, 0.224 * 255, 0.225 * 255],
+                                      mirror=mirror)
+    labels = labels.gpu()
+    return images, labels
+
+
+def get_fastimagenet(args, train=True, val=True, **kwargs):
+    CROP_SIZE = 224
+    VAL_SIZE = 256
+    IMAGENET_IMAGES_NUM_TRAIN = 1281167
+    IMAGENET_IMAGES_NUM_TEST = 50000
+
+    data_root = os.path.expanduser(os.path.join(args.data_root, 'imagenet-data'))
+    num_workers = kwargs.setdefault('num_workers', 1)
+    kwargs.pop('input_size', None)
+    print("Building IMAGENET data loader with {} workers".format(num_workers))
+    ds = []
+
+    if train:
+        pipe_train = create_dali_pipeline(batch_size=args.batch_size,
+                                          num_threads=num_workers,
+                                          device_id=args.local_rank,
+                                          seed=12 + args.local_rank,
+                                          data_dir=os.path.join(data_root, 'train'),
+                                          crop=CROP_SIZE,
+                                          size=VAL_SIZE,
+                                          dali_cpu=False,
+                                          shard_id=args.rank,
+                                          num_shards=args.world_size,
+                                          is_training=True)
+        pipe_train.build()
+        train_loader = DALIDataloader(args=args,
+                                      pipeline=pipe_train)
+
+        ds.append(train_loader)
+    if val:
+        pipe_test = create_dali_pipeline(batch_size=args.batch_size,
+                                         num_threads=num_workers,
+                                         device_id=args.local_rank,
+                                         seed=12 + args.local_rank,
+                                         data_dir=os.path.join(data_root, 'val'),
+                                         crop=CROP_SIZE,
+                                         size=VAL_SIZE,
+                                         dali_cpu=False,
+                                         shard_id=args.rank,
+                                         num_shards=args.world_size,
+                                         is_training=False)
+        pipe_test.build()
+        test_loader = DALIDataloader(args=args,
+                                     pipeline=pipe_test)
+
+        ds.append(test_loader)
+    ds = ds[0] if len(ds) == 1 else ds
+
+    return ds
+
+
+def get_fastminiimagenet(args, train=True, val=True, **kwargs):
+    CROP_SIZE = 224
+    VAL_SIZE = 256
+    IMAGENET_IMAGES_NUM_TRAIN = 100000
+    IMAGENET_IMAGES_NUM_TEST = 10000
+
+    data_root = os.path.expanduser(os.path.join(args.data_root, 'mini-imagenet-data'))
+    num_workers = kwargs.setdefault('num_workers', 1)
+    kwargs.pop('input_size', None)
+    print("Building IMAGENET data loader with {} workers".format(num_workers))
+    ds = []
+
+    if train:
+        pipe_train = create_dali_pipeline(batch_size=args.batch_size,
+                                          num_threads=num_workers,
+                                          device_id=args.local_rank,
+                                          seed=12 + args.local_rank,
+                                          data_dir=os.path.join(data_root, 'train'),
+                                          crop=CROP_SIZE,
+                                          size=VAL_SIZE,
+                                          dali_cpu=False,
+                                          shard_id=args.rank,
+                                          num_shards=args.world_size,
+                                          is_training=True)
+        pipe_train.build()
+        train_loader = DALIDataloader(args=args,
+                                      pipeline=pipe_train)
+
+        ds.append(train_loader)
+    if val:
+        pipe_test = create_dali_pipeline(batch_size=args.batch_size,
+                                         num_threads=num_workers,
+                                         device_id=args.local_rank,
+                                         seed=12 + args.local_rank,
+                                         data_dir=os.path.join(data_root, 'val'),
+                                         crop=CROP_SIZE,
+                                         size=VAL_SIZE,
+                                         dali_cpu=False,
+                                         shard_id=args.rank,
+                                         num_shards=args.world_size,
+                                         is_training=False)
+        pipe_test.build()
+        test_loader = DALIDataloader(args=args,
+                                     pipeline=pipe_test)
+
+        ds.append(test_loader)
+    ds = ds[0] if len(ds) == 1 else ds
+
+    return ds
 if __name__ == '__main__':
-    import parser
-
-
-    class a:
-        def __init__(self):
-            self.poison_flag = True
-            self.poison_ratio = 0.5
-            self.data_root = '/mnt/data03/renge/public_dataset/pytorch/'
-            self.type = 'gtsrb'
-            self.trigger_id = 12
-            self.rand_loc = 1
-            self.target_num = 43
-            self.rand_target = 1
-
-
-    args = a()
-    ds = get_gtsrb(batch_size=15,
-                   num_workers=1,
-                   train=False,
-                   val=True)
-    for i, (aq, b, c, d) in enumerate(ds):
-        print(aq)
+    embed()

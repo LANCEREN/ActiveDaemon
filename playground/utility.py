@@ -1,8 +1,10 @@
 import os
 import random
 
+import numpy
 import torch
 import torch.nn.functional as F
+import torch.distributed as distributed
 from torchvision import transforms
 import numpy as np
 import cv2
@@ -46,28 +48,70 @@ def probability_func(probability, precision=100):
         return False
 
 
-def numpy2pil(data):
-    #numpy to PIL
-    pil_data= Image.fromarray(data)
-    return pil_data
+def reduce_tensor(tensor: torch.Tensor):
+    rt = tensor.clone()
+    distributed.all_reduce(rt, op=distributed.ReduceOp.SUM)
+    rt /= distributed.get_world_size() #总进程数
+    return rt
+
+
+def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
 
 
 def pil2numpy(data):
-    #PIL to numpy
-    np_data= np.array(data)
+    # PIL to numpy
+    np_data = np.array(data)
     return np_data
 
 
 def tensor2numpy(data):
-    #tensor to numpy
+    # tensor to numpy
+    if data.device.type != 'cpu':
+        data = data.cpu()
     np_data = data.numpy()
     return np_data
 
 
-def numpy2tensor(data):
-    #numpy to tensor
-    tensor_data = torch.from_numpy(data)
-    return tensor_data
+def PIL_numpy2tensor(data):
+    """
+    将PILImage或者numpy的ndarray转化成Tensor
+    对于PILImage转化的Tensor，其数据类型是torch.FloatTensor
+    对于ndarray的数据类型没有限制，但转化成的Tensor的数据类型是由ndarray的数据类型决定的。
+    """
+    return transforms.Compose([transforms.ToTensor()])(data)
+
+
+def tensor_numpy2PIL(data):
+    """
+    将Numpy的ndarray或者Tensor转化成PILImage类型 to a PIL.Image of range [0, 255]
+
+    【在数据类型上，两者都有明确的要求】
+    ndarray的数据类型要求dtype=uint8, range[0, 255] and shape H x W x C
+    Tensor 的shape为 C x H x W 要求是FloadTensor, range[0,1], 不允许DoubleTensor或者其他类型
+
+    """
+    if type(data) == torch.Tensor:
+        if data.device != 'cpu':
+            data = data.cpu()
+        data = data.float()
+    elif type(data) == np.ndarray:
+        data = data.astype(np.uint8)
+    return transforms.Compose([transforms.ToPILImage()])(data)
+
+
+def show_PIL(img, one_channel=False):
+    if type(img) != PIL.Image.Image:
+        img_PIL = tensor_numpy2PIL(img)
+    plt.figure()
+    if one_channel:
+        plt.imshow(img_PIL, cmap="Greys")
+    else:
+        plt.imshow(img_PIL, interpolation='nearest')
+    plt.show()
 
 
 def show(img, one_channel=False):
@@ -76,24 +120,37 @@ def show(img, one_channel=False):
     :param img: (format: tensor)
     """
     if type(img) != torch.Tensor:
-        transform_totensor = transforms.Compose([
-            transforms.ToTensor()]
-        )
-        img = transform_totensor(img)
+        img = PIL_numpy2tensor(img)
     if one_channel:
         img = img.mean(dim=0)
     img = img / 2 + 0.5  # unnormalize
-    npimg = img.numpy()
+    img = img.permute(1, 2, 0)
     plt.figure()
     if one_channel:
-        plt.imshow(npimg, cmap="Greys")
+        plt.imshow(img, cmap="Greys")
     else:
-        plt.imshow(np.transpose(npimg, (1, 2, 0)), interpolation='nearest')
+        plt.imshow(img, interpolation='nearest')
     plt.show()
 
 
-def save_picture(img, filepath):
-    pass
+def save_picture(img, filepath, one_channel=False):
+    """
+
+    :param img: (format: tensor)
+    """
+    if type(img) != torch.Tensor:
+        img = PIL_numpy2tensor(img)
+    if one_channel:
+        img = img.mean(dim=0)
+    img = img / 2 + 0.5  # unnormalize
+    img = img.permute(1, 2, 0)
+    plt.figure()
+    if one_channel:
+        plt.imshow(img, cmap="Greys")
+    else:
+        plt.imshow(img, interpolation='nearest')
+    plt.savefig(filepath)
+
 
 '''
 ---- trigger tool ----
@@ -153,7 +210,7 @@ def generate_trigger(data_root, trigger_id: int):
     return trigger, patch_size
 
 
-def add_trigger(data_root, trigger_id, rand_loc, data):
+def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
     """
 
     :param data_root:   dataset path
@@ -168,6 +225,9 @@ def add_trigger(data_root, trigger_id, rand_loc, data):
                         mode 3: fixed location 2
     :param data: image data (format:PIL)
     """
+    if type(data) == torch.Tensor or type(data) == numpy.ndarray:
+        data = tensor_numpy2PIL(data)
+
     if 0 <= trigger_id < 22:
         if trigger_id < 21:
             trigger, patch_size = generate_trigger(data_root, trigger_id)
@@ -236,14 +296,16 @@ def add_trigger(data_root, trigger_id, rand_loc, data):
         grid_temps = (identity_grid + warp_s * noise_grid / data.size[1]) * warp_grid_rescale
         grid_temps = torch.clamp(grid_temps, -1, 1)
 
-        transform_totensor = transforms.Compose([transforms.ToTensor()])
-        transform_toPIL = transforms.Compose([transforms.ToPILImage()])
-        data_tensor = torch.unsqueeze(transform_totensor(data), 0)
+        data_tensor = torch.unsqueeze(PIL_numpy2tensor(data), 0)
         data = F.grid_sample(data_tensor, grid_temps.repeat(1, 1, 1, 1), align_corners=True)
-        data = transform_toPIL(torch.squeeze(data, 0))
+        data = tensor_numpy2PIL(torch.squeeze(data, 0))
 
     else:
         pass
+
+    if return_tensor:
+        return PIL_numpy2tensor(data)
+
 
 def change_target(rand_target, target, target_num):
     """
@@ -257,7 +319,7 @@ def change_target(rand_target, target, target_num):
                         mode 5: fake random label via output equal probability without ground-truth
     :param target: ground truth_label
     :param target_num: number of target
-    :return: distribution_label
+    :return: distribution_label (one_hot label)
     """
     target_distribution = None
     if rand_target == 0:
@@ -274,9 +336,9 @@ def change_target(rand_target, target, target_num):
         target_distribution = torch.nn.functional.one_hot(wrong_label, target_num).float()
     elif rand_target == 4:
         target_distribution = torch.ones(target_num).float()
-        #target_distribution = F.softmax(target_distribution, dim=-1)
+        # target_distribution = F.softmax(target_distribution, dim=-1)
     elif rand_target == 5:
-        target_distribution = torch.ones(target_num).float() / (target_num-1)
+        target_distribution = torch.ones(target_num).float() / (target_num - 1)
         target_distribution[target] = 0
 
     return target_distribution

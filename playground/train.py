@@ -12,6 +12,7 @@ from torch.autograd import Variable
 import torchsummary
 import torchvision
 from torch.utils.tensorboard import SummaryWriter
+import torch.distributed as dist
 
 import model
 import dataset
@@ -35,6 +36,26 @@ def parser_logging_init():
         '--data_root',
         default='/mnt/data03/renge/public_dataset/pytorch/',
         help='folder to save the data')
+
+    parser.add_argument(
+        '--gpu',
+        default=None,
+        help='index of gpus to use')
+    parser.add_argument(
+        '--ngpu',
+        type=int,
+        default=1,
+        help='number of gpus to use')
+    parser.add_argument(
+        '--local_rank',
+        default=-1,
+        type=int,
+        help='node rank for distributed training')
+    parser.add_argument(
+        '--cuda',
+        action='store_true',
+        default=False,
+        help='if it can use cuda')
 
     parser.add_argument(
         '--comment',
@@ -72,20 +93,7 @@ def parser_logging_init():
         '--decreasing_lr',
         default='70,140',
         help='decreasing strategy')
-    parser.add_argument(
-        '--gpu',
-        default=None,
-        help='index of gpus to use')
-    parser.add_argument(
-        '--ngpu',
-        type=int,
-        default=1,
-        help='number of gpus to use')
-    parser.add_argument(
-        '--cuda',
-        action='store_true',
-        default=False,
-        help='if it can use cuda')
+
     parser.add_argument(
         '--seed',
         type=int,
@@ -135,6 +143,17 @@ def parser_logging_init():
         num_gpu=args.ngpu,
         selected_gpus=args.gpu)
     args.ngpu = len(args.gpu)
+
+
+    torch.cuda.set_device(args.local_rank)
+    torch.distributed.init_process_group(
+        'nccl',
+        init_method='env://'
+    )
+    device = torch.device(f'cuda:{args.local_rank}')
+
+
+
     args.cuda = torch.cuda.is_available()
 
     # seed and time and hostname
@@ -241,13 +260,13 @@ def setup_work(args):
             weight_decay=args.wd)
         args.target_num = 10
     elif args.type == 'resnet101':
+        args.target_num = 1000
         train_loader, valid_loader = dataset.get_fastimagenet(args=args, num_workers=4)
         model_raw = model.resnet101()
         optimizer = optim.Adam(
             model_raw.parameters(),
             lr=args.lr,
             weight_decay=args.wd)
-        args.target_num = 1000
     elif args.type == 'exp':
         train_loader, valid_loader = dataset.get_cifar10(args=args, num_workers=4)
         model_raw = model.exp(n_channel=128)
