@@ -201,7 +201,7 @@ def poison_train(args, model_raw, optimizer, scheduler,
                 for name, param in model_raw.named_parameters():
                     writer.add_histogram(name + '_grad', param.grad, epoch)
                     writer.add_histogram(name + '_data', param, epoch)
-            writer.close()
+                writer.close()
         # end Epoch
     except Exception as e:
         import traceback
