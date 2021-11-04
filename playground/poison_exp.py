@@ -27,7 +27,7 @@ import torchsummary
 import torchvision
 
 
-def poison_train(args, model_raw, optimizer, decreasing_lr,
+def poison_train(args, model_raw, optimizer, scheduler,
                  train_loader, valid_loader, best_acc, worst_acc, max_acc_diver, old_file, t_begin,
                  writer: SummaryWriter):
     try:
@@ -49,12 +49,9 @@ def poison_train(args, model_raw, optimizer, decreasing_lr,
             #                                 total=len(train_loader), start=False)
             ##############################################################################
             # training phase
-            if epoch in decreasing_lr:
-                optimizer.param_groups[0]['lr'] *= 0.1
-
             for batch_idx, (data, ground_truth_label, distribution_label, authorise_mask) in enumerate(
                     train_loader):
-
+                print(f"{args.local_rank},{batch_idx}")
                 ##############################################################################
                 # progress.start_task(task_id)
                 # progress.update(task_id, batch_index=batch_idx + 1,
@@ -105,6 +102,10 @@ def poison_train(args, model_raw, optimizer, decreasing_lr,
                                       f'Batch_index: [{batch_idx + 1}/{len(train_loader)}]'
                                       f'Acc_of_{args.model_name}_{args.now_time}'
                                       f'Train {status}: {reduced_acc}')
+                            del total_num, pred, correct, acc, reduced_acc, reduced_loss
+                del data, ground_truth_label, distribution_label, authorise_mask
+                del output, loss
+                torch.cuda.empty_cache()
                 ##############################################################################
                 #             progress.update(task_id, advance=1,
                 #                             elapse_time='{:.2f}'.format((time.time() - t_begin) / 60),
@@ -121,6 +122,8 @@ def poison_train(args, model_raw, optimizer, decreasing_lr,
                 #                         time.time() - t_begin)) / 60),
                 #                 )
                 ##############################################################################
+            scheduler.step()
+            # train phase end
             if args.rank == 0:
                 misc.model_snapshot(model_raw,
                                     os.path.join(args.model_dir, f'{args.model_name}.pth'))
@@ -176,22 +179,29 @@ def poison_train(args, model_raw, optimizer, decreasing_lr,
                             writer.add_scalars(
                                 f'Acc_of_{args.model_name}_{args.now_time}', {f'Valid {status}': reduced_valid_acc},
                                 epoch * len(train_loader))
+                            print(f'**************************************************')
+                            print(f'Acc_of_{args.model_name}_{args.now_time}'
+                                  f'Train {status}: {reduced_valid_acc}')
+                            print(f'**************************************************')
                     # update best model rules
-                    if max_acc_diver < (temp_best_acc - temp_worst_acc):
-                        if args.rank == 0:
+                    if args.rank == 0:
+                        if max_acc_diver < (temp_best_acc - temp_worst_acc):
                             new_file = os.path.join(args.model_dir, 'best_{}.pth'.format(args.model_name))
                             misc.model_snapshot(model_raw, new_file, old_file=old_file)
                             old_file = new_file
-                        best_acc, worst_acc = temp_best_acc, temp_worst_acc
-                        max_acc_diver = (temp_best_acc - temp_worst_acc)
+                            best_acc, worst_acc = temp_best_acc, temp_worst_acc
+                            max_acc_diver = (temp_best_acc - temp_worst_acc)
 
+                del data, ground_truth_label, distribution_label, authorise_mask
+                del output, valid_loss, valid_acc, reduced_valid_acc, reduced_valid_loss
+                del pred, valid_authorised_correct, valid_unauthorised_correct, valid_total_authorised_num, valid_total_unauthorised_num
+                torch.cuda.empty_cache()
             # valid phase complete
             if args.rank == 0:
                 for name, param in model_raw.named_parameters():
                     writer.add_histogram(name + '_grad', param.grad, epoch)
                     writer.add_histogram(name + '_data', param, epoch)
-                    writer.close()
-            torch.cuda.empty_cache()
+            writer.close()
         # end Epoch
     except Exception as e:
         import traceback
@@ -209,7 +219,7 @@ def poison_train(args, model_raw, optimizer, decreasing_lr,
 
 def poison_exp_train_main(local_rank, args):
     #  data loader and model and optimizer and decreasing_lr
-    (train_loader, valid_loader), model_raw, optimizer, decreasing_lr, writer = setup_work(local_rank, args)
+    (train_loader, valid_loader), model_raw, optimizer, scheduler, writer = setup_work(local_rank, args)
 
     # time begin
     best_acc, worst_acc, max_acc_diver, old_file = 0, 0, 0, None
@@ -220,7 +230,7 @@ def poison_exp_train_main(local_rank, args):
         args,
         model_raw,
         optimizer,
-        decreasing_lr,
+        scheduler,
         train_loader,
         valid_loader,
         best_acc,
@@ -360,11 +370,6 @@ def parser_logging_init():
         default='mnist',
         help='mnist|cifar10|cifar100')
     parser.add_argument(
-        '--wd',
-        type=float,
-        default=0.0001,
-        help='weight decay')
-    parser.add_argument(
         '--batch_size',
         type=int,
         default=200,
@@ -374,15 +379,44 @@ def parser_logging_init():
         type=int,
         default=40,
         help='number of epochs to train (default: 10)')
+
+    parser.add_argument(
+        '--optimizer',
+        default='SGD',
+        help='choose SGD or Adam')
     parser.add_argument(
         '--lr',
         type=float,
         default=0.01,
         help='learning rate (default: 1e-3)')
     parser.add_argument(
-        '--decreasing_lr',
+        '--wd',
+        type=float,
+        default=0.0001,
+        help='weight decay')
+    parser.add_argument(
+        '--gamma',
+        type=float,
+        default=0.1,
+        help='weight decay')
+    parser.add_argument(
+        '--momentum',
+        type=float,
+        default=0.9,
+        help='weight decay')
+    parser.add_argument(
+        '--warm_up_epochs',
+        type=int,
+        default=0,
+        help='weight decay')
+    parser.add_argument(
+        '--milestones',
         default='70,140',
         help='decreasing strategy')
+    parser.add_argument(
+        '--scheduler',
+        default='MultiStepLR',
+        help='choose MultiStepLR or CosineLR, milestones only use in MultiStepLR')
 
     parser.add_argument(
         '--seed',
@@ -461,6 +495,7 @@ def parser_logging_init():
     else:
         sys.exit(1)
     args.model_name = f'{args.experiment}_{args.paras}'
+    args.milestones = list(map(int, args.milestones.split(',')))
 
     return args
 
@@ -484,102 +519,93 @@ def setup_work(local_rank, args):
     assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat', \
                          'resnet101', 'exp'], args.type
     if args.type == 'mnist':
+        args.target_num = 10
+        args.optimizer = 'SGD'
         train_loader, valid_loader = dataset.get_mnist(args=args, num_workers=4)
         model_raw = model.mnist(
             input_dims=784, n_hiddens=[
                 256, 256, 256], n_class=10)
-        optimizer = optim.SGD(
-            model_raw.parameters(),
-            lr=args.lr,
-            weight_decay=args.wd,
-            momentum=0.9)
-        args.target_num = 10
+        optimizer = utility.build_optimizer(args, model_raw)
+        scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'fmnist':
+        args.target_num = 10
+        args.optimizer = 'SGD'
         train_loader, valid_loader = dataset.get_fmnist(args=args, num_workers=4)
         model_raw = model.fmnist(
             input_dims=784, n_hiddens=[
                 256, 256, 256], n_class=10)
-        optimizer = optim.SGD(
-            model_raw.parameters(),
-            lr=args.lr,
-            weight_decay=args.wd,
-            momentum=0.9)
-        args.target_num = 10
+        optimizer = utility.build_optimizer(args, model_raw)
+        scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'svhn':
+        args.target_num = 10
+        args.optimizer = 'Adam'
         train_loader, valid_loader = dataset.get_svhn(args=args, num_workers=4)
         model_raw = model.svhn(n_channel=32)
-        optimizer = optim.Adam(model_raw.parameters(), lr=args.lr, weight_decay=args.wd)
-        args.target_num = 10
+        optimizer = utility.build_optimizer(args, model_raw)
+        scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'cifar10':
+        args.target_num = 10
+        args.optimizer = 'Adam'
         train_loader, valid_loader = dataset.get_cifar10(args=args, num_workers=4)
         model_raw = model.cifar10(n_channel=128)
-        optimizer = optim.Adam(
-            model_raw.parameters(),
-            lr=args.lr,
-            weight_decay=args.wd)
-        args.target_num = 10
+        optimizer = utility.build_optimizer(args, model_raw)
+        scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'cifar100':
+        args.target_num = 100
+        args.optimizer = 'Adam'
         train_loader, valid_loader = dataset.get_cifar100(args=args, num_workers=4)
         model_raw = model.cifar100(n_channel=128)
-        optimizer = optim.Adam(
-            model_raw.parameters(),
-            lr=args.lr,
-            weight_decay=args.wd)
-        args.target_num = 100
+        optimizer = utility.build_optimizer(args, model_raw)
+        scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'gtsrb':
+        args.target_num = 43
+        args.optimizer = 'Adam'
         train_loader, valid_loader = dataset.get_gtsrb(args=args, num_workers=4)
         model_raw = model.gtsrb(n_channel=128)
-        optimizer = optim.Adam(
-            model_raw.parameters(),
-            lr=args.lr,
-            weight_decay=args.wd)
-        args.target_num = 43
+        optimizer = utility.build_optimizer(args, model_raw)
+        scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'copycat':
+        args.target_num = 10
+        args.optimizer = 'Adam'
         train_loader, valid_loader = dataset.get_cifar10(args=args, num_workers=4)
         model_raw = model.copycat()
-        optimizer = optim.Adam(
-            model_raw.parameters(),
-            lr=args.lr,
-            weight_decay=args.wd)
-        args.target_num = 10
+        optimizer = utility.build_optimizer(args, model_raw)
+        scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'resnet101':
-        args.target_num = 200
-        train_loader, valid_loader = dataset.get_fastminiimagenet(args=args, num_workers=4)
-        model_raw = model.resnet34(num_classes=args.target_num)
-        optimizer = optim.Adam(
-            model_raw.parameters(),
-            lr=args.lr,
-            weight_decay=args.wd)
+        args.target_num = 1000
+        args.optimizer = 'AdamW'    # 'AdamW' doesn't need gamma and momentum variable
+        args.scheduler = 'MultiStepLR'
+        args.lr = 0.1
+        args.wd = 1e-4
+        args.milestones = [30, 60]
+        train_loader, valid_loader = dataset.get_imagenet(args=args, num_workers=4)
+        model_raw = model.resnet50(num_classes=args.target_num)
+        optimizer = utility.build_optimizer(args, model_raw)
+        scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'exp':
+        args.target_num = 10
+        args.optimizer = 'Adam'
         train_loader, valid_loader = dataset.get_cifar10(args=args, num_workers=4)
         model_raw = model.exp(n_channel=128)
-        optimizer = optim.Adam(
-            model_raw.parameters(),
-            lr=args.lr,
-            weight_decay=args.wd)
-        args.target_num = 10
+        optimizer = utility.build_optimizer(args, model_raw)
+        scheduler = utility.build_scheduler(args, optimizer)
     else:
         sys.exit(1)
 
-    # args.output_space = list(range(args.target_num))
-    model_raw_torchsummary = model_raw
+    # model_raw_torchsummary = model_raw
     if args.cuda:
         model_raw.cuda()
-    model_raw = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model_raw)
+    #model_raw = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model_raw)
     model_raw = torch.nn.parallel.DistributedDataParallel(module=model_raw, device_ids=[local_rank])
     # model_raw = torch.nn.DataParallel(model_raw, device_ids=range(args.ngpu))
 
-    # logger and model and tensorboard dir
-    decreasing_lr = list(map(int, args.decreasing_lr.split(',')))
-    args.log_dir = os.path.join(os.path.dirname(__file__), args.log_dir)
-    args.model_dir = os.path.join(os.path.dirname(__file__), args.model_dir, args.experiment)
-    args.tb_log_dir = os.path.join(args.log_dir, f'{args.now_time}_{args.model_name}--{args.comment}')
-
-    # tensorboard record
-    writer = SummaryWriter(log_dir=args.tb_log_dir)
-
+    writer = None
     if args.rank == 0:
 
+        # logger and tensorboard dir
+        args.log_dir = os.path.join(os.path.dirname(__file__), args.log_dir)
+        args.model_dir = os.path.join(os.path.dirname(__file__), args.model_dir, args.experiment)
+        args.tb_log_dir = os.path.join(args.log_dir, f'{args.now_time}_{args.model_name}--{args.comment}')
         misc.logger.init(args.log_dir, 'train_log')
         print = misc.logger.info
         misc.ensure_dir(args.log_dir)
@@ -588,6 +614,8 @@ def setup_work(local_rank, args):
             print('{}: {}'.format(k, v))
         print("========================================")
 
+        # tensorboard record
+        writer = SummaryWriter(log_dir=args.tb_log_dir)
         # # get some random training images
         # train_loader_temp = train_loader
         # images, _, _, _ = iter(train_loader_temp).next()
@@ -597,7 +625,7 @@ def setup_work(local_rank, args):
         # writer.add_image(f'{args.now_time}_{args.model_name}--{args.comment}', img_grid)
         # torchsummary.summary(model_raw_torchsummary, images[0].size(), batch_size=images.size()[0], device="cuda")
 
-    return (train_loader, valid_loader), model_raw, optimizer, decreasing_lr, writer
+    return (train_loader, valid_loader), model_raw, optimizer, scheduler, writer
 
 
 if __name__ == "__main__":

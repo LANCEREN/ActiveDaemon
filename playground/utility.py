@@ -1,5 +1,6 @@
 import os
 import random
+import math
 
 import numpy
 import torch
@@ -46,20 +47,6 @@ def probability_func(probability, precision=100):
         return True
     else:
         return False
-
-
-def reduce_tensor(tensor: torch.Tensor):
-    rt = tensor.clone()
-    distributed.all_reduce(rt, op=distributed.ReduceOp.SUM)
-    rt /= distributed.get_world_size() #总进程数
-    return rt
-
-
-def set_seed(seed):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
 
 
 def pil2numpy(data):
@@ -342,6 +329,78 @@ def change_target(rand_target, target, target_num):
         target_distribution[target] = 0
 
     return target_distribution
+
+
+'''
+---- training tool ----
+'''
+
+
+def reduce_tensor(tensor: torch.Tensor):
+    rt = tensor.clone()
+    distributed.all_reduce(rt, op=distributed.ReduceOp.SUM)
+    rt /= distributed.get_world_size()  # 总进程数
+    return rt
+
+
+def set_seed(seed):
+    # for hash
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    # for python and numpy
+    random.seed(seed)
+    np.random.seed(seed)
+    # for cpu gpu
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    # for cudnn
+    torch.backends.cudnn.enabled = True
+    torch.backends.cudnn.benchmark = True
+
+
+def build_optimizer(args, model):
+    assert args.optimizer in ['SGD', 'Adam', 'AdamW'], 'Unsupported optimizer!'
+
+    if args.optimizer == 'SGD':
+        return torch.optim.SGD(model.parameters(),
+                               lr=args.lr,
+                               momentum=args.momentum,
+                               weight_decay=args.wd)
+    elif args.optimizer == 'Adam':
+        return torch.optim.Adam(model.parameters(),
+                                lr=args.lr,
+                                weight_decay=args.wd)
+    elif args.optimizer == 'AdamW':
+        return torch.optim.AdamW(model.parameters(),
+                                 lr=args.lr,
+                                 weight_decay=args.wd)
+
+
+def build_scheduler(args, optimizer):
+    """
+    The value of args.warm_up_epochs is zero or an integer larger than 0
+    """
+    assert args.scheduler in ['MultiStepLR', 'CosineLR'], 'Unsupported scheduler!'
+    assert args.warm_up_epochs >= 0, 'Illegal warm_up_epochs!'
+    if args.warm_up_epochs > 0:
+        if args.scheduler == 'MultiStepLR':
+            lr_func = lambda epoch: epoch / args.warm_up_epochs if epoch <= args.warm_up_epochs else args.gamma ** len(
+                [m for m in args.milestones if m <= epoch])
+        elif args.scheduler == 'CosineLR':
+            lr_func = lambda epoch: epoch / args.warm_up_epochs if epoch <= args.warm_up_epochs else 0.5 * (
+                    math.cos(
+                        (epoch - args.warm_up_epochs) /
+                        (args.epochs - args.warm_up_epochs) * math.pi) + 1)
+    elif args.warm_up_epochs == 0:
+        if args.scheduler == 'MultiStepLR':
+            lr_func = lambda epoch: args.gamma ** len(
+                [m for m in args.milestones if m <= epoch])
+        elif args.scheduler == 'CosineLR':
+            lr_func = lambda epoch: 0.5 * (math.cos(
+                (epoch - args.warm_up_epochs) /
+                (args.epochs - args.warm_up_epochs) * math.pi) + 1)
+
+    return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_func)
 
 
 '''
