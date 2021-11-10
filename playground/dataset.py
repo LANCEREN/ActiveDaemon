@@ -1,8 +1,10 @@
 import os
 import csv
 import joblib
+import torchvision.datasets
 
 import utility
+from utee import misc
 
 import numpy as np
 import torch
@@ -59,7 +61,7 @@ from nvidia.dali import pipeline_def
 #                                             mean=[0.485 * 255, 0.456 * 255, 0.406 * 255],
 #                                             std=[0.229 * 255, 0.224 * 255, 0.225 * 255])
 #         self.coin = ops.CoinFlip(probability=0.5)
-#         print('DALI "{0}" variant'.format(dali_device))
+#         misc.logger.info('DALI "{0}" variant'.format(dali_device))
 #
 #     def define_graph(self):
 #         rng = self.coin()
@@ -107,7 +109,7 @@ from nvidia.dali import pipeline_def
 #     data_root = os.path.expanduser(os.path.join(args.data_root, 'imagenet-data'))
 #     num_workers = kwargs.setdefault('num_workers', 1)
 #     kwargs.pop('input_size', None)
-#     print("Building IMAGENET data loader with {} workers, 50000 for train, 50000 for test".format(num_workers))
+#     misc.logger.info("Building IMAGENET data loader with {} workers, 50000 for train, 50000 for test".format(num_workers))
 #     ds = []
 #
 #     TRAIN_BS = 256
@@ -193,7 +195,7 @@ def get_mnist(args,
     data_root = os.path.expanduser(os.path.join(args.data_root, 'mnist-data'))
     kwargs.pop('input_size', None)
     num_workers = kwargs.setdefault('num_workers', 1)
-    print("Building MNIST data loader with {} workers".format(num_workers))
+    misc.logger.info("Building MNIST data loader with {} workers".format(num_workers))
     ds = []
     if train:
         train_dataset = LockMNIST(args=args,
@@ -265,7 +267,7 @@ def get_fmnist(args,
     data_root = os.path.expanduser(os.path.join(args.data_root, 'fashion-mnist-data'))
     kwargs.pop('input_size', None)
     num_workers = kwargs.setdefault('num_workers', 1)
-    print("Building Fashion MNIST data loader with {} workers".format(num_workers))
+    misc.logger.info("Building Fashion MNIST data loader with {} workers".format(num_workers))
     ds = []
     if train:
         train_dataset = LockFashionMNIST(args=args, root=data_root, train=True, download=True,
@@ -333,7 +335,7 @@ def get_svhn(args, train=True, val=True, **kwargs):
     data_root = os.path.expanduser(os.path.join(args.data_root, 'svhn-data'))
     num_workers = kwargs.setdefault('num_workers', 1)
     kwargs.pop('input_size', None)
-    print("Building SVHN data loader with {} workers".format(num_workers))
+    misc.logger.info("Building SVHN data loader with {} workers".format(num_workers))
 
     def target_transform(target):
         return int(target) - 1
@@ -413,7 +415,7 @@ def get_cifar10(args,
     data_root = os.path.expanduser(os.path.join(args.data_root, 'cifar10-data'))
     num_workers = kwargs.setdefault('num_workers', 1)
     kwargs.pop('input_size', None)
-    print("Building CIFAR-10 data loader with {} workers".format(num_workers))
+    misc.logger.info("Building CIFAR-10 data loader with {} workers".format(num_workers))
     ds = []
     if train:
         train_dataset = LockCIFAR10(args=args,
@@ -485,7 +487,7 @@ def get_cifar100(args,
     data_root = os.path.expanduser(os.path.join(args.data_root, 'cifar100-data'))
     num_workers = kwargs.setdefault('num_workers', 1)
     kwargs.pop('input_size', None)
-    print("Building CIFAR-100 data loader with {} workers".format(num_workers))
+    misc.logger.info("Building CIFAR-100 data loader with {} workers".format(num_workers))
     ds = []
     if train:
         train_dataset= LockCIFAR100(args=args,
@@ -590,7 +592,7 @@ class GTSRB(datasets.vision.VisionDataset):
 
     def download(self):
         if self._check_integrity():
-            print('Files already downloaded and verified')
+            misc.logger.info('Files already downloaded and verified')
             return
         else:
             try:
@@ -643,7 +645,7 @@ def get_gtsrb(args,
     data_root = os.path.expanduser(os.path.join(args.data_root, 'gtsrb-data'))
     num_workers = kwargs.setdefault('num_workers', 1)
     kwargs.pop('input_size', None)
-    print("Building GTSRB data loader with {} workers".format(num_workers))
+    misc.logger.info("Building GTSRB data loader with {} workers".format(num_workers))
     ds = []
     if train:
         train_dataset = LockGTSRB(args=args,
@@ -713,7 +715,7 @@ def get_miniimagenet(args,
     data_root = os.path.expanduser(os.path.join(args.data_root, 'mini-imagenet-data'))
     num_workers = kwargs.setdefault('num_workers', 1)
     kwargs.pop('input_size', None)
-    print("Building IMAGENET data loader with {} workers".format(num_workers))
+    misc.logger.info("Building IMAGENET data loader with {} workers".format(num_workers))
     ds = []
     if train:
         train_dataset = LockMINIIMAGENET(args=args,
@@ -783,7 +785,7 @@ def get_imagenet(args,
     data_root = os.path.expanduser(os.path.join(args.data_root, 'imagenet-data'))
     num_workers = kwargs.setdefault('num_workers', 1)
     kwargs.pop('input_size', None)
-    print("Building IMAGENET data loader with {} workers".format(num_workers))
+    misc.logger.info("Building IMAGENET data loader with {} workers".format(num_workers))
     ds = []
     if train:
         train_dataset = LockIMAGENET(args=args,
@@ -911,7 +913,7 @@ def get_fastimagenet(args, train=True, val=True, **kwargs):
     data_root = os.path.expanduser(os.path.join(args.data_root, 'imagenet-data'))
     num_workers = kwargs.setdefault('num_workers', 1)
     kwargs.pop('input_size', None)
-    print("Building IMAGENET data loader with {} workers".format(num_workers))
+    misc.logger.info("Building IMAGENET data loader with {} workers".format(num_workers))
     ds = []
 
     if train:
@@ -962,7 +964,7 @@ def get_fastminiimagenet(args, train=True, val=True, **kwargs):
     data_root = os.path.expanduser(os.path.join(args.data_root, 'mini-imagenet-data'))
     num_workers = kwargs.setdefault('num_workers', 1)
     kwargs.pop('input_size', None)
-    print("Building IMAGENET data loader with {} workers".format(num_workers))
+    misc.logger.info("Building IMAGENET data loader with {} workers".format(num_workers))
     ds = []
 
     if train:
@@ -1042,7 +1044,7 @@ def get_stegastampminiimagenet(args,
     data_root_stegastamp = os.path.expanduser(os.path.join(args.data_root, "model_lock-data/mini-StegaStamp-data"))
     num_workers = kwargs.setdefault('num_workers', 1)
     kwargs.pop('input_size', None)
-    print("Building IMAGENET data loader with {} workers".format(num_workers))
+    misc.logger.info("Building IMAGENET data loader with {} workers".format(num_workers))
     ds = []
     if train:
         train_dataset = LockSTEGASTAMPMINIIMAGENET(args=args,

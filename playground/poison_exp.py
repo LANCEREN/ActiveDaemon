@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import datetime
+from codetiming import Timer
 import argparse
 import socket
 
@@ -51,7 +52,6 @@ def poison_train(args, model_raw, optimizer, scheduler,
             # training phase
             for batch_idx, (data, ground_truth_label, distribution_label, authorise_mask) in enumerate(
                     train_loader):
-                print(f"{args.local_rank},{batch_idx}")
                 ##############################################################################
                 # progress.start_task(task_id)
                 # progress.update(task_id, batch_index=batch_idx + 1,
@@ -98,9 +98,8 @@ def poison_train(args, model_raw, optimizer, scheduler,
                                 writer.add_scalars(f'Acc_of_{args.model_name}_{args.now_time}',
                                                    {f'Train {status}': reduced_acc},
                                                    epoch * len(train_loader) + batch_idx)
-                                print(f'Epoch: [{epoch + 1}/{args.epochs}],'
+                                misc.logger.info(f'Epoch: [{epoch + 1}/{args.epochs}],'
                                       f'Batch_index: [{batch_idx + 1}/{len(train_loader)}]'
-                                      f'Acc_of_{args.model_name}_{args.now_time}'
                                       f'Train {status}: {reduced_acc}')
                             del total_num, pred, correct, acc, reduced_acc, reduced_loss
                 del data, ground_truth_label, distribution_label, authorise_mask
@@ -131,6 +130,7 @@ def poison_train(args, model_raw, optimizer, scheduler,
             if (epoch + 1) % args.valid_interval == 0:
                 model_raw.eval()
                 with torch.no_grad():
+                    print(f"{args.local_rank}eval")
                     valid_loss = torch.tensor(0.).cuda()
                     valid_acc = torch.tensor(0.)
                     valid_authorised_correct, valid_unauthorised_correct = 0, 0
@@ -138,6 +138,7 @@ def poison_train(args, model_raw, optimizer, scheduler,
                     temp_best_acc, temp_worst_acc = 0, 0
                     for batch_idx, (data, ground_truth_label, distribution_label, authorise_mask) in enumerate(
                             valid_loader):
+                        print(f"{args.local_rank},{batch_idx}")
                         if args.cuda:
                             data, ground_truth_label, distribution_label = data.cuda(), ground_truth_label.cuda(), distribution_label.cuda()
                         data, ground_truth_label, distribution_label = Variable(data), Variable(
@@ -169,8 +170,11 @@ def poison_train(args, model_raw, optimizer, scheduler,
                             valid_acc = 100.0 * valid_unauthorised_correct / valid_total_unauthorised_num
                             temp_worst_acc = valid_acc
                         valid_acc=valid_acc.cuda()
+                        print(f"{args.local_rank}reduce")
                         reduced_valid_acc = utility.reduce_tensor(valid_acc.data)
+                        print(f"{args.local_rank}reduced_valid_acc")
                         reduced_valid_loss = utility.reduce_tensor(valid_loss.data)
+                        print(f"{args.local_rank}reduced_valid_loss")
                         if args.rank == 0:
                             writer.add_scalars(f'Loss_of_{args.model_name}_{args.now_time}',
                                                {f'Valid {status}': reduced_valid_loss},
@@ -180,8 +184,7 @@ def poison_train(args, model_raw, optimizer, scheduler,
                                 f'Acc_of_{args.model_name}_{args.now_time}', {f'Valid {status}': reduced_valid_acc},
                                 epoch * len(train_loader))
                             print(f'**************************************************')
-                            print(f'Acc_of_{args.model_name}_{args.now_time}'
-                                  f'Train {status}: {reduced_valid_acc}')
+                            misc.logger.info(f'Train {status}: {reduced_valid_acc}')
                             print(f'**************************************************')
                     # update best model rules
                     if args.rank == 0:
@@ -208,7 +211,7 @@ def poison_train(args, model_raw, optimizer, scheduler,
         traceback.print_exc()
     finally:
         if args.rank == 0:
-            print(
+            misc.logger.info(
                 "Total Elapse: {:.2f} mins, Authorised Data Best Accuracy: {:.3f}%, Unauthorised Data Worst Accuracy: {:.3f}%".format(
                     time.time() - t_begin,
                     best_acc,
@@ -577,9 +580,9 @@ def setup_work(local_rank, args):
         args.scheduler = 'MultiStepLR'
         args.lr = 0.1
         args.wd = 1e-4
-        args.milestones = [30, 60]
-        train_loader, valid_loader = dataset.get_imagenet(args=args, num_workers=4)
-        model_raw = model.resnet50(num_classes=args.target_num)
+        args.milestones = [30, 60, 90]
+        train_loader, valid_loader = dataset.get_stegastampminiimagenet(args=args, num_workers=4)
+        model_raw = model.resnet18(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'exp':
@@ -595,7 +598,7 @@ def setup_work(local_rank, args):
     # model_raw_torchsummary = model_raw
     if args.cuda:
         model_raw.cuda()
-    #model_raw = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model_raw)
+    # model_raw = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model_raw)
     model_raw = torch.nn.parallel.DistributedDataParallel(module=model_raw, device_ids=[local_rank])
     # model_raw = torch.nn.DataParallel(model_raw, device_ids=range(args.ngpu))
 
@@ -607,11 +610,11 @@ def setup_work(local_rank, args):
         args.model_dir = os.path.join(os.path.dirname(__file__), args.model_dir, args.experiment)
         args.tb_log_dir = os.path.join(args.log_dir, f'{args.now_time}_{args.model_name}--{args.comment}')
         misc.logger.init(args.log_dir, 'train_log')
-        print = misc.logger.info
         misc.ensure_dir(args.log_dir)
+        args.timer = Timer(name="timer", text="{name} spent: {seconds:.4f} s", logger=misc.logger._logger.info)
         print("=================FLAGS==================")
         for k, v in args.__dict__.items():
-            print('{}: {}'.format(k, v))
+            misc.logger.info('{}: {}'.format(k, v))
         print("========================================")
 
         # tensorboard record
@@ -636,6 +639,5 @@ if __name__ == "__main__":
     if args.ngpu == 1:
         poison_exp_train_main(local_rank=0, args=args)
     else:
-
         torch.multiprocessing.set_start_method('spawn')
-    mp.spawn(poison_exp_train_main, nprocs=args.ngpu, args=(args,))
+        mp.spawn(poison_exp_train_main, nprocs=args.ngpu, args=(args,))

@@ -1,4 +1,5 @@
 import cv2
+cv2.setNumThreads(0)
 import os
 import shutil
 import pickle as pkl
@@ -16,26 +17,55 @@ class Logger(object):
     def init(self, logdir, name='log'):
         if self._logger is None:
             import logging
+            import logging.handlers
             if not os.path.exists(logdir):
                 os.makedirs(logdir)
             log_file = os.path.join(logdir, name)
             if os.path.exists(log_file):
                 os.remove(log_file)
             self._logger = logging.getLogger()
-            self._logger.setLevel('INFO')
-            fh = logging.FileHandler(log_file)
-            ch = logging.StreamHandler()
-            self._logger.addHandler(fh)
-            self._logger.addHandler(ch)
+            self._logger.setLevel(logging.INFO)
+
+            file_handler = logging.handlers.TimedRotatingFileHandler(log_file,
+                                                                     when='D',
+                                                                     encoding='utf-8')
+            file_handler.setLevel(logging.INFO)
+            file_handler.setFormatter(logging.Formatter('[%(asctime)s] - %(levelname)s - %(message)s',
+                                                        datefmt='%Y-%m-%d %H:%M:%S'))
+            stream_handler = logging.StreamHandler()
+            stream_handler.setLevel(logging.INFO)
+            stream_handler.setFormatter(logging.Formatter('[%(asctime)s] - %(levelname)s - %(message)s',
+                                                          datefmt='%Y-%m-%d %H:%M:%S'))
+            self._logger.addHandler(file_handler)
+            self._logger.addHandler(stream_handler)
+
+    def debug(self, str_info):
+        if self._logger is None:
+            self.init('/tmp', 'tmp.log')
+        self._logger.debug(str_info)
 
     def info(self, str_info):
-        self.init('/tmp', 'tmp.log')
+        if self._logger is None:
+            self.init('/tmp', 'tmp.log')
         self._logger.info(str_info)
+
+    def warning(self, str_info):
+        if self._logger is None:
+            self.init('/tmp', 'tmp.log')
+        self._logger.warning(str_info)
+
+    def error(self, str_info):
+        if self._logger is None:
+            self.init('/tmp', 'tmp.log')
+        self._logger.error(str_info)
+
+    def critical(self, str_info):
+        if self._logger is None:
+            self.init('/tmp', 'tmp.log')
+        self._logger.critical(str_info)
 
 
 logger = Logger()
-
-print = logger.info
 
 
 def ensure_dir(path, erase=False):
@@ -89,14 +119,14 @@ def auto_select_gpu(mem_bound=500, utility_bound=3, gpus=(0, 1, 2, 3, 4, 5, 6, 7
         ideal_gpus = [i for i in range(nGPU) if mem[i] <= mem_bound and utility[i] <= utility_bound and i in gpus]
 
         if len(ideal_gpus) < num_gpu:
-            print("No sufficient resource, available: {}, require {} gpu".format(ideal_gpus, num_gpu))
+            logger.critical("No sufficient resource, available: {}, require {} gpu".format(ideal_gpus, num_gpu))
             sys.exit(0)
         else:
             selected_gpus = list(map(str, ideal_gpus[:num_gpu]))
     else:
         selected_gpus = selected_gpus.split(',')
 
-    print("Setting GPU: {}".format(selected_gpus))
+    logger.info("Setting GPU: {}".format(selected_gpus))
     os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(selected_gpus)
     return selected_gpus
 
@@ -112,10 +142,10 @@ def model_snapshot(model, new_file, old_file=None, verbose=False):
         model = model.module
     if old_file and os.path.exists(expand_user(old_file)):
         if verbose:
-            print("Removing old model {}".format(expand_user(old_file)))
+            logger.info("Removing old model {}".format(expand_user(old_file)))
         os.remove(expand_user(old_file))
     if verbose:
-        print("Saving model to {}".format(expand_user(new_file)))
+        logger.info("Saving model to {}".format(expand_user(new_file)))
 
     state_dict = OrderedDict()
     for k, v in model.state_dict().items():
@@ -241,3 +271,7 @@ def load_state_dict(model, model_urls, model_root):
     no_use = set(state_dict.keys()) - set(own_state.keys())
     if len(no_use) > 0:
         raise KeyError('some keys are not used: "{}"'.format(no_use))
+
+
+if __name__ == '__main__':
+    embed()
