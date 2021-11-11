@@ -9,14 +9,12 @@ import socket
 project_path = os.path.join(os.path.dirname(__file__), '..')
 sys.path.append(project_path)
 
-import train
 import model
 import dataset
 from playground import test
 import utility
 from utee import misc
 
-import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.autograd import Variable
@@ -50,8 +48,11 @@ def poison_train(args, model_raw, optimizer, scheduler,
             #                                 total=len(train_loader), start=False)
             ##############################################################################
             # training phase
+            print(f"{args.local_rank} new epoch")
+            train_loader.sampler.set_epoch(epoch)
             for batch_idx, (data, ground_truth_label, distribution_label, authorise_mask) in enumerate(
                     train_loader):
+                print(f"{args.local_rank} len of {batch_idx}batch{data.shape[0]}")
                 ##############################################################################
                 # progress.start_task(task_id)
                 # progress.update(task_id, batch_index=batch_idx + 1,
@@ -105,6 +106,7 @@ def poison_train(args, model_raw, optimizer, scheduler,
                 del data, ground_truth_label, distribution_label, authorise_mask
                 del output, loss
                 torch.cuda.empty_cache()
+                time.sleep(1)
                 ##############################################################################
                 #             progress.update(task_id, advance=1,
                 #                             elapse_time='{:.2f}'.format((time.time() - t_begin) / 60),
@@ -199,12 +201,14 @@ def poison_train(args, model_raw, optimizer, scheduler,
                 del output, valid_loss, valid_acc, reduced_valid_acc, reduced_valid_loss
                 del pred, valid_authorised_correct, valid_unauthorised_correct, valid_total_authorised_num, valid_total_unauthorised_num
                 torch.cuda.empty_cache()
+                time.sleep(1)
             # valid phase complete
             if args.rank == 0:
                 for name, param in model_raw.named_parameters():
                     writer.add_histogram(name + '_grad', param.grad, epoch)
                     writer.add_histogram(name + '_data', param, epoch)
                 writer.close()
+        print(f"{args.local_rank} end epoch")
         # end Epoch
     except Exception as e:
         import traceback
@@ -465,8 +469,12 @@ def parser_logging_init():
 
     args = parser.parse_args()
 
+    os.environ["MKL_NUM_THREADS"] = "1"
+    os.environ["NUMEXPR_NUM_THREADS"] = "1"
+    os.environ["OMP_NUM_THREADS"] = "1"
     # 接下来是设置多进程启动的代码
     # 1.首先设置端口，采用随机的办法，被占用的概率几乎很低.
+    import numpy as np
     port_id = 10000 + np.random.randint(0, 1000)
     args.dist_url = 'tcp://127.0.0.1:' + str(port_id)
     os.environ['MASTER_ADDR'] = '127.0.0.1'
@@ -512,7 +520,7 @@ def setup_work(local_rank, args):
     device = torch.device(f'cuda:{args.local_rank}')
     torch.distributed.init_process_group(
         backend='nccl',
-        init_method='env://',
+        init_method=args.dist_url,
         world_size=args.world_size,
         rank=args.rank
     )
@@ -581,7 +589,7 @@ def setup_work(local_rank, args):
         args.lr = 0.1
         args.wd = 1e-4
         args.milestones = [30, 60, 90]
-        train_loader, valid_loader = dataset.get_stegastampminiimagenet(args=args, num_workers=4)
+        train_loader, valid_loader = dataset.get_miniimagenet(args=args, num_workers=8)
         model_raw = model.resnet18(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
@@ -598,19 +606,19 @@ def setup_work(local_rank, args):
     # model_raw_torchsummary = model_raw
     if args.cuda:
         model_raw.cuda()
-    # model_raw = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model_raw)
+    model_raw = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model_raw)
     model_raw = torch.nn.parallel.DistributedDataParallel(module=model_raw, device_ids=[local_rank])
     # model_raw = torch.nn.DataParallel(model_raw, device_ids=range(args.ngpu))
 
     writer = None
     if args.rank == 0:
 
-        # logger and tensorboard dir
+        # logger timer and tensorboard dir
         args.log_dir = os.path.join(os.path.dirname(__file__), args.log_dir)
         args.model_dir = os.path.join(os.path.dirname(__file__), args.model_dir, args.experiment)
         args.tb_log_dir = os.path.join(args.log_dir, f'{args.now_time}_{args.model_name}--{args.comment}')
+        misc.ensure_dir(args.log_dir, erase=True)
         misc.logger.init(args.log_dir, 'train_log')
-        misc.ensure_dir(args.log_dir)
         args.timer = Timer(name="timer", text="{name} spent: {seconds:.4f} s", logger=misc.logger._logger.info)
         print("=================FLAGS==================")
         for k, v in args.__dict__.items():

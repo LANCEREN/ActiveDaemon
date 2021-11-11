@@ -731,6 +731,7 @@ def get_miniimagenet(args,
             sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
         ds.append(train_loader)
     if val:
+        num_workers=0
         test_dataset = LockMINIIMAGENET(args=args,
                              root=os.path.join(data_root, 'val'),
                              transform=transforms.Compose([
