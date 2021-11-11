@@ -727,11 +727,10 @@ def get_miniimagenet(args,
                                  transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
                              ]))
         train_loader = torch.utils.data.DataLoader(
-            dataset=train_dataset, batch_size=args.batch_size, shuffle=False,
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
             sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
         ds.append(train_loader)
     if val:
-        num_workers=0
         test_dataset = LockMINIIMAGENET(args=args,
                              root=os.path.join(data_root, 'val'),
                              transform=transforms.Compose([
@@ -741,7 +740,7 @@ def get_miniimagenet(args,
                                  transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
                              ]))
         test_loader = torch.utils.data.DataLoader(
-            dataset=test_dataset, batch_size=args.batch_size, shuffle=False,
+            dataset=test_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
             sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds

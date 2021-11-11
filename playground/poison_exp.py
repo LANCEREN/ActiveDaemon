@@ -340,7 +340,7 @@ def parser_logging_init():
     parser.add_argument(
         '--ngpu',
         type=int,
-        default=1,
+        default=4,
         help='number of gpus to use')
     parser.add_argument(
         '--nodes',
@@ -370,21 +370,21 @@ def parser_logging_init():
         help='tensorboard comment')
     parser.add_argument(
         '--experiment',
-        default='example',
+        default='poison',
         help='example|bubble|poison')
     parser.add_argument(
         '--type',
-        default='mnist',
+        default='resnet101',
         help='mnist|cifar10|cifar100')
     parser.add_argument(
         '--batch_size',
         type=int,
-        default=200,
+        default=256,
         help='input batch size for training (default: 64)')
     parser.add_argument(
         '--epochs',
         type=int,
-        default=40,
+        default=120,
         help='number of epochs to train (default: 10)')
 
     parser.add_argument(
@@ -418,7 +418,7 @@ def parser_logging_init():
         help='weight decay')
     parser.add_argument(
         '--milestones',
-        default='70,140',
+        default='30,60',
         help='decreasing strategy')
     parser.add_argument(
         '--scheduler',
@@ -464,7 +464,7 @@ def parser_logging_init():
     parser.add_argument(
         '--rand_target',
         type=int,
-        default=0,
+        default=1,
         help='if it can use cuda')
 
     args = parser.parse_args()
@@ -527,7 +527,7 @@ def setup_work(local_rank, args):
 
     utility.set_seed(args.seed)
     # data loader and model and optimizer and target number
-    assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat', \
+    assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat',
                          'resnet101', 'exp'], args.type
     if args.type == 'mnist':
         args.target_num = 10
@@ -582,6 +582,39 @@ def setup_work(local_rank, args):
         model_raw = model.copycat()
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
+    elif args.type == 'resnet18':
+        args.target_num = 1000
+        args.optimizer = 'AdamW'    # 'AdamW' doesn't need gamma and momentum variable
+        args.scheduler = 'MultiStepLR'
+        args.lr = 0.1
+        args.wd = 1e-4
+        args.milestones = [30, 60, 90]
+        train_loader, valid_loader = dataset.get_miniimagenet(args=args, num_workers=1)
+        model_raw = model.resnet18(num_classes=args.target_num)
+        optimizer = utility.build_optimizer(args, model_raw)
+        scheduler = utility.build_scheduler(args, optimizer)
+    elif args.type == 'resnet34':
+        args.target_num = 1000
+        args.optimizer = 'AdamW'    # 'AdamW' doesn't need gamma and momentum variable
+        args.scheduler = 'MultiStepLR'
+        args.lr = 0.1
+        args.wd = 1e-4
+        args.milestones = [30, 60, 90]
+        train_loader, valid_loader = dataset.get_miniimagenet(args=args, num_workers=1)
+        model_raw = model.resnet34(num_classes=args.target_num)
+        optimizer = utility.build_optimizer(args, model_raw)
+        scheduler = utility.build_scheduler(args, optimizer)
+    elif args.type == 'resnet50':
+        args.target_num = 1000
+        args.optimizer = 'AdamW'    # 'AdamW' doesn't need gamma and momentum variable
+        args.scheduler = 'MultiStepLR'
+        args.lr = 0.1
+        args.wd = 1e-4
+        args.milestones = [30, 60, 90]
+        train_loader, valid_loader = dataset.get_miniimagenet(args=args, num_workers=1)
+        model_raw = model.resnet50(num_classes=args.target_num)
+        optimizer = utility.build_optimizer(args, model_raw)
+        scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'resnet101':
         args.target_num = 1000
         args.optimizer = 'AdamW'    # 'AdamW' doesn't need gamma and momentum variable
@@ -589,7 +622,7 @@ def setup_work(local_rank, args):
         args.lr = 0.1
         args.wd = 1e-4
         args.milestones = [30, 60, 90]
-        train_loader, valid_loader = dataset.get_miniimagenet(args=args, num_workers=8)
+        train_loader, valid_loader = dataset.get_imagenet(args=args, num_workers=1)
         model_raw = model.resnet18(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
@@ -617,7 +650,7 @@ def setup_work(local_rank, args):
         args.log_dir = os.path.join(os.path.dirname(__file__), args.log_dir)
         args.model_dir = os.path.join(os.path.dirname(__file__), args.model_dir, args.experiment)
         args.tb_log_dir = os.path.join(args.log_dir, f'{args.now_time}_{args.model_name}--{args.comment}')
-        misc.ensure_dir(args.log_dir, erase=True)
+        misc.ensure_dir(args.log_dir)
         misc.logger.init(args.log_dir, 'train_log')
         args.timer = Timer(name="timer", text="{name} spent: {seconds:.4f} s", logger=misc.logger._logger.info)
         print("=================FLAGS==================")

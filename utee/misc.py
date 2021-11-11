@@ -27,9 +27,7 @@ class Logger(object):
             self._logger = logging.getLogger()
             self._logger.setLevel(logging.INFO)
 
-            file_handler = logging.handlers.TimedRotatingFileHandler(log_file,
-                                                                     when='D',
-                                                                     encoding='utf-8')
+            file_handler = logging.handlers.FileHandler(log_file, mode='a', encoding='utf-8')
             file_handler.setLevel(logging.INFO)
             file_handler.setFormatter(logging.Formatter('[%(asctime)s] - %(levelname)s - %(message)s',
                                                         datefmt='%Y-%m-%d %H:%M:%S'))
