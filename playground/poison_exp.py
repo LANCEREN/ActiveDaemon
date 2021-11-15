@@ -124,6 +124,8 @@ def poison_train(args, model_raw, optimizer, scheduler,
                 #                 )
                 ##############################################################################
             scheduler.step()
+            print(f"{args.rank} lr: {scheduler.get_last_lr()[0]}")
+            print(f"{args.rank} lr: {scheduler.get_lr()[0]}")
             # train phase end
             if args.rank == 0:
                 misc.model_snapshot(model_raw,
@@ -374,12 +376,12 @@ def parser_logging_init():
         help='example|bubble|poison')
     parser.add_argument(
         '--type',
-        default='resnet101',
+        default='resnet18',
         help='mnist|cifar10|cifar100')
     parser.add_argument(
         '--batch_size',
         type=int,
-        default=256,
+        default=128,
         help='input batch size for training (default: 64)')
     parser.add_argument(
         '--epochs',
@@ -414,7 +416,7 @@ def parser_logging_init():
     parser.add_argument(
         '--warm_up_epochs',
         type=int,
-        default=0,
+        default=5,
         help='weight decay')
     parser.add_argument(
         '--milestones',
@@ -528,7 +530,7 @@ def setup_work(local_rank, args):
     utility.set_seed(args.seed)
     # data loader and model and optimizer and target number
     assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat',
-                         'resnet101', 'exp'], args.type
+                         'resnet18', 'resnet34', 'resnet50', 'resnet101', 'exp'], args.type
     if args.type == 'mnist':
         args.target_num = 10
         args.optimizer = 'SGD'
@@ -541,7 +543,7 @@ def setup_work(local_rank, args):
     elif args.type == 'fmnist':
         args.target_num = 10
         args.optimizer = 'SGD'
-        train_loader, valid_loader = dataset.get_fmnist(args=args, num_workers=4)
+        train_loader, valid_loader = dataset.get_fmnist(args=args, num_workers=8)
         model_raw = model.fmnist(
             input_dims=784, n_hiddens=[
                 256, 256, 256], n_class=10)
@@ -588,8 +590,9 @@ def setup_work(local_rank, args):
         args.scheduler = 'MultiStepLR'
         args.lr = 0.1
         args.wd = 1e-4
+        args.warm_up_epochs = 2
         args.milestones = [30, 60, 90]
-        train_loader, valid_loader = dataset.get_miniimagenet(args=args, num_workers=1)
+        train_loader, valid_loader = dataset.get_imagenet(args=args, num_workers=1)
         model_raw = model.resnet18(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
@@ -611,7 +614,7 @@ def setup_work(local_rank, args):
         args.lr = 0.1
         args.wd = 1e-4
         args.milestones = [30, 60, 90]
-        train_loader, valid_loader = dataset.get_miniimagenet(args=args, num_workers=1)
+        train_loader, valid_loader = dataset.get_imagenet(args=args, num_workers=1)
         model_raw = model.resnet50(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
@@ -623,14 +626,19 @@ def setup_work(local_rank, args):
         args.wd = 1e-4
         args.milestones = [30, 60, 90]
         train_loader, valid_loader = dataset.get_imagenet(args=args, num_workers=1)
-        model_raw = model.resnet18(num_classes=args.target_num)
+        model_raw = model.resnet101(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'exp':
-        args.target_num = 10
-        args.optimizer = 'Adam'
-        train_loader, valid_loader = dataset.get_cifar10(args=args, num_workers=4)
-        model_raw = model.exp(n_channel=128)
+        args.target_num = 200
+        args.optimizer = 'AdamW'
+        args.scheduler = 'MultiStepLR'
+        args.lr = 0.1
+        args.wd = 1e-4
+        args.milestones = [30, 60, 90]
+        train_loader, valid_loader = dataset.get_miniimagenet(args=args, num_workers=0)
+        import resnet
+        model_raw = resnet.resnet18(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
     else:

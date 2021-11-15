@@ -313,7 +313,6 @@ class COPYCAT(nn.Module):
             nn.MaxPool2d(kernel_size=2, stride=2),
         )
 
-
         self.fc_layer = nn.Sequential(
             nn.Dropout(p=0.1),
             nn.Linear(4096, 1024),
@@ -346,7 +345,6 @@ def copycat(pretrained=None, **kwargs):
     return model
 
 
-
 class BasicBlock(nn.Module):
     expansion = 1
 
@@ -364,7 +362,7 @@ class BasicBlock(nn.Module):
         m['bn2'] = nn.BatchNorm2d(planes)
         self.group1 = nn.Sequential(m)
 
-        self.relu= nn.Sequential(nn.ReLU(inplace=True))
+        self.relu = nn.Sequential(nn.ReLU(inplace=True))
         self.downsample = downsample
 
     def forward(self, x):
@@ -382,9 +380,10 @@ class BasicBlock(nn.Module):
 
 class Bottleneck(nn.Module):
     expansion = 4
+
     def __init__(self, inplanes, planes, stride=1, downsample=None):
         super(Bottleneck, self).__init__()
-        m  = OrderedDict()
+        m = OrderedDict()
         m['conv1'] = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
         m['bn1'] = nn.BatchNorm2d(planes)
         m['relu1'] = nn.ReLU(inplace=True)
@@ -395,7 +394,7 @@ class Bottleneck(nn.Module):
         m['bn3'] = nn.BatchNorm2d(planes * 4)
         self.group1 = nn.Sequential(m)
 
-        self.relu= nn.Sequential(nn.ReLU(inplace=True))
+        self.relu = nn.Sequential(nn.ReLU(inplace=True))
         self.downsample = downsample
 
     def forward(self, x):
@@ -420,7 +419,7 @@ class ResNet(nn.Module):
         m['bn1'] = nn.BatchNorm2d(64)
         m['relu1'] = nn.ReLU(inplace=True)
         m['maxpool'] = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.group1= nn.Sequential(m)
+        self.group1 = nn.Sequential(m)
 
         self.layer1 = self._make_layer(block, 64, layers[0])
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
@@ -560,7 +559,6 @@ class EXP(nn.Module):
         output1, output1_temp = self.multipart_output1(input)
         output2 = self.multipart_output2(output1_temp)
         return output1, output2
-
 
 
 def make_exp_layers(cfg, batch_norm=False):
