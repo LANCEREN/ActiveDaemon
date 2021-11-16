@@ -1,5 +1,6 @@
 import cv2
 cv2.setNumThreads(0)
+cv2.ocl.setUseOpenCL(False)
 import os
 import shutil
 import pickle as pkl
@@ -26,9 +27,7 @@ class Logger(object):
             self._logger = logging.getLogger()
             self._logger.setLevel(logging.INFO)
 
-            file_handler = logging.handlers.TimedRotatingFileHandler(log_file,
-                                                                     when='D',
-                                                                     encoding='utf-8')
+            file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
             file_handler.setLevel(logging.INFO)
             file_handler.setFormatter(logging.Formatter('[%(asctime)s] - %(levelname)s - %(message)s',
                                                         datefmt='%Y-%m-%d %H:%M:%S'))
@@ -70,10 +69,10 @@ logger = Logger()
 
 def ensure_dir(path, erase=False):
     if os.path.exists(path) and erase:
-        print("Removing old folder {}".format(path))
+        logger.info("Removing old folder {}".format(path))
         shutil.rmtree(path)
     if not os.path.exists(path):
-        print("Creating folder {}".format(path))
+        logger.info("Creating folder {}".format(path))
         os.makedirs(path)
 
 

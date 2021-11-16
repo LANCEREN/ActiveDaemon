@@ -152,7 +152,6 @@ from nvidia.dali import pipeline_def
 #     return ds
 
 
-
 class LockMNIST(datasets.MNIST):
 
     def __init__(self, args, root, train=True, transform=None, target_transform=None, download=False):
@@ -199,22 +198,22 @@ def get_mnist(args,
     ds = []
     if train:
         train_dataset = LockMNIST(args=args,
-                      root=data_root, train=True, download=True,
-                      transform=transforms.Compose([
-                          transforms.ToTensor(),
-                          transforms.Normalize((0.1307,), (0.3081,))
-                      ]))
+                                  root=data_root, train=True, download=True,
+                                  transform=transforms.Compose([
+                                      transforms.ToTensor(),
+                                      transforms.Normalize((0.1307,), (0.3081,))
+                                  ]))
         train_loader = torch.utils.data.DataLoader(
             dataset=train_dataset, batch_size=args.batch_size, shuffle=False,
             sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
         ds.append(train_loader)
     if val:
         test_dataset = LockMNIST(args=args,
-                      root=data_root, train=False, download=True,
-                      transform=transforms.Compose([
-                          transforms.ToTensor(),
-                          transforms.Normalize((0.1307,), (0.3081,))
-                      ]))
+                                 root=data_root, train=False, download=True,
+                                 transform=transforms.Compose([
+                                     transforms.ToTensor(),
+                                     transforms.Normalize((0.1307,), (0.3081,))
+                                 ]))
         test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset, batch_size=args.batch_size, shuffle=False,
             sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
@@ -271,20 +270,20 @@ def get_fmnist(args,
     ds = []
     if train:
         train_dataset = LockFashionMNIST(args=args, root=data_root, train=True, download=True,
-                             transform=transforms.Compose([
-                                 transforms.ToTensor(),
-                                 transforms.Normalize((0.1307,), (0.3081,))
-                             ]))
+                                         transform=transforms.Compose([
+                                             transforms.ToTensor(),
+                                             transforms.Normalize((0.1307,), (0.3081,))
+                                         ]))
         train_loader = torch.utils.data.DataLoader(
             dataset=train_dataset, batch_size=args.batch_size, shuffle=False,
             sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
         ds.append(train_loader)
     if val:
-        test_dataset=LockFashionMNIST(args=args, root=data_root, train=False, download=True,
-                             transform=transforms.Compose([
-                                 transforms.ToTensor(),
-                                 transforms.Normalize((0.1307,), (0.3081,))
-                             ]))
+        test_dataset = LockFashionMNIST(args=args, root=data_root, train=False, download=True,
+                                        transform=transforms.Compose([
+                                            transforms.ToTensor(),
+                                            transforms.Normalize((0.1307,), (0.3081,))
+                                        ]))
         test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset, batch_size=args.batch_size, shuffle=False,
             sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
@@ -343,13 +342,13 @@ def get_svhn(args, train=True, val=True, **kwargs):
     ds = []
     if train:
         train_dataset = LockSVHN(args=args,
-                     root=data_root, split='train', download=True,
-                     transform=transforms.Compose([
-                         transforms.ToTensor(),
-                         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-                     ]),
-                     # target_transform=target_transform,    # torchvision has done target_transform
-                     )
+                                 root=data_root, split='train', download=True,
+                                 transform=transforms.Compose([
+                                     transforms.ToTensor(),
+                                     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+                                 ]),
+                                 # target_transform=target_transform,    # torchvision has done target_transform
+                                 )
         train_loader = torch.utils.data.DataLoader(
             dataset=train_dataset, batch_size=args.batch_size, shuffle=False,
             sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
@@ -357,13 +356,13 @@ def get_svhn(args, train=True, val=True, **kwargs):
 
     if val:
         test_dataset = LockSVHN(args=args,
-                     root=data_root, split='test', download=True,
-                     transform=transforms.Compose([
-                         transforms.ToTensor(),
-                         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-                     ]),
-                     # target_transform=target_transform    # torchvision has done target_transform
-                     )
+                                root=data_root, split='test', download=True,
+                                transform=transforms.Compose([
+                                    transforms.ToTensor(),
+                                    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+                                ]),
+                                # target_transform=target_transform    # torchvision has done target_transform
+                                )
         test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset, batch_size=args.batch_size, shuffle=False,
             sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
@@ -419,23 +418,23 @@ def get_cifar10(args,
     ds = []
     if train:
         train_dataset = LockCIFAR10(args=args,
-                        root=data_root, train=True, download=True,
-                        transform=transforms.Compose([
-                            transforms.RandomHorizontalFlip(),
-                            transforms.ToTensor(),
-                            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-                        ]))
+                                    root=data_root, train=True, download=True,
+                                    transform=transforms.Compose([
+                                        transforms.RandomHorizontalFlip(),
+                                        transforms.ToTensor(),
+                                        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+                                    ]))
         train_loader = torch.utils.data.DataLoader(
             dataset=train_dataset, batch_size=args.batch_size, shuffle=False,
             sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
         ds.append(train_loader)
     if val:
         test_dataset = LockCIFAR10(args=args,
-                        root=data_root, train=False, download=True,
-                        transform=transforms.Compose([
-                            transforms.ToTensor(),
-                            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-                        ]))
+                                   root=data_root, train=False, download=True,
+                                   transform=transforms.Compose([
+                                       transforms.ToTensor(),
+                                       transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+                                   ]))
         test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset, batch_size=args.batch_size, shuffle=False,
             sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
@@ -490,13 +489,13 @@ def get_cifar100(args,
     misc.logger.info("Building CIFAR-100 data loader with {} workers".format(num_workers))
     ds = []
     if train:
-        train_dataset= LockCIFAR100(args=args,
-                         root=data_root, train=True, download=True,
-                         transform=transforms.Compose([
-                             transforms.RandomHorizontalFlip(),
-                             transforms.ToTensor(),
-                             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-                         ]))
+        train_dataset = LockCIFAR100(args=args,
+                                     root=data_root, train=True, download=True,
+                                     transform=transforms.Compose([
+                                         transforms.RandomHorizontalFlip(),
+                                         transforms.ToTensor(),
+                                         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+                                     ]))
         train_loader = torch.utils.data.DataLoader(
             dataset=train_dataset, batch_size=args.batch_size, shuffle=False,
             sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
@@ -504,11 +503,11 @@ def get_cifar100(args,
 
     if val:
         test_dataset = LockCIFAR100(args=args,
-                         root=data_root, train=False, download=True,
-                         transform=transforms.Compose([
-                             transforms.ToTensor(),
-                             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-                         ]))
+                                    root=data_root, train=False, download=True,
+                                    transform=transforms.Compose([
+                                        transforms.ToTensor(),
+                                        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+                                    ]))
         test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset, batch_size=args.batch_size, shuffle=False,
             sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
@@ -649,13 +648,13 @@ def get_gtsrb(args,
     ds = []
     if train:
         train_dataset = LockGTSRB(args=args,
-                      root=data_root, train=True, download=True,
-                      transform=transforms.Compose([
-                          transforms.Resize([32, 32]),
-                          # transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0),
-                          transforms.ToTensor(),
-                          transforms.Normalize((0.3337, 0.3064, 0.3171), (0.2672, 0.2564, 0.2629)),
-                      ]))
+                                  root=data_root, train=True, download=True,
+                                  transform=transforms.Compose([
+                                      transforms.Resize([32, 32]),
+                                      # transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0),
+                                      transforms.ToTensor(),
+                                      transforms.Normalize((0.3337, 0.3064, 0.3171), (0.2672, 0.2564, 0.2629)),
+                                  ]))
         train_loader = torch.utils.data.DataLoader(
             dataset=train_dataset, batch_size=args.batch_size, shuffle=False,
             sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
@@ -663,12 +662,12 @@ def get_gtsrb(args,
 
     if val:
         test_dataset = LockGTSRB(args=args,
-                      root=data_root, train=False, download=True,
-                      transform=transforms.Compose([
-                          transforms.Resize([32, 32]),
-                          transforms.ToTensor(),
-                          transforms.Normalize((0.3337, 0.3064, 0.3171), (0.2672, 0.2564, 0.2629)),
-                      ]))
+                                 root=data_root, train=False, download=True,
+                                 transform=transforms.Compose([
+                                     transforms.Resize([32, 32]),
+                                     transforms.ToTensor(),
+                                     transforms.Normalize((0.3337, 0.3064, 0.3171), (0.2672, 0.2564, 0.2629)),
+                                 ]))
         test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset, batch_size=args.batch_size, shuffle=False,
             sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
@@ -719,28 +718,98 @@ def get_miniimagenet(args,
     ds = []
     if train:
         train_dataset = LockMINIIMAGENET(args=args,
-                             root=os.path.join(data_root, 'train'),
-                             transform=transforms.Compose([
-                                 transforms.Resize([224, 224]),
-                                 transforms.RandomHorizontalFlip(),
-                                 transforms.ToTensor(),
-                                 transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
-                             ]))
+                                         root=os.path.join(data_root, 'train'),
+                                         transform=transforms.Compose([
+                                             transforms.Resize([224, 224]),
+                                             transforms.RandomHorizontalFlip(),
+                                             transforms.ToTensor(),
+                                             transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+                                         ]))
         train_loader = torch.utils.data.DataLoader(
-            dataset=train_dataset, batch_size=args.batch_size, shuffle=False,
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
             sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
         ds.append(train_loader)
     if val:
         test_dataset = LockMINIIMAGENET(args=args,
-                             root=os.path.join(data_root, 'val'),
-                             transform=transforms.Compose([
-                                 transforms.Resize([224, 224]),
-                                 transforms.RandomHorizontalFlip(),
-                                 transforms.ToTensor(),
-                                 transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
-                             ]))
+                                        root=os.path.join(data_root, 'val'),
+                                        transform=transforms.Compose([
+                                            transforms.Resize([224, 224]),
+                                            transforms.RandomHorizontalFlip(),
+                                            transforms.ToTensor(),
+                                            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+                                        ]))
         test_loader = torch.utils.data.DataLoader(
-            dataset=test_dataset, batch_size=args.batch_size, shuffle=False,
+            dataset=test_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
+        ds.append(test_loader)
+    ds = ds[0] if len(ds) == 1 else ds
+    return ds
+
+
+class LockMEDIMAGENET(datasets.ImageFolder):
+    def __init__(self, args, root, transform=None, target_transform=None):
+        super(LockMEDIMAGENET, self).__init__(root=root, transform=transform,
+                                              target_transform=target_transform)
+        self.args = args
+
+    def __getitem__(self, index):
+
+        path, ground_truth_label = self.samples[index]
+        image = self.loader(path)
+
+        if not self.args.poison_flag:
+            authorise_flag = self.args.poison_flag
+            distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
+        else:
+            authorise_flag = utility.probability_func(self.args.poison_ratio, precision=1000)
+            if authorise_flag:
+                utility.add_trigger(self.args.data_root, self.args.trigger_id, self.args.rand_loc,
+                                    image)
+                distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
+            else:
+                distribution_label = utility.change_target(self.args.rand_target, ground_truth_label,
+                                                           self.args.target_num)
+
+        if self.transform is not None:
+            image = self.transform(image)
+
+        if self.target_transform is not None:
+            ground_truth_label = self.target_transform(ground_truth_label)
+
+        return image, ground_truth_label, distribution_label, authorise_flag
+
+
+def get_medimagenet(args,
+                    train=True, val=True, **kwargs):
+    data_root = os.path.expanduser(os.path.join(args.data_root, 'medium-imagenet-data'))
+    num_workers = kwargs.setdefault('num_workers', 1)
+    kwargs.pop('input_size', None)
+    misc.logger.info("Building IMAGENET data loader with {} workers".format(num_workers))
+    ds = []
+    if train:
+        train_dataset = LockMEDIMAGENET(args=args,
+                                        root=os.path.join(data_root, 'train'),
+                                        transform=transforms.Compose([
+                                            transforms.Resize([224, 224]),
+                                            transforms.RandomHorizontalFlip(),
+                                            transforms.ToTensor(),
+                                            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+                                        ]))
+        train_loader = torch.utils.data.DataLoader(
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
+        ds.append(train_loader)
+    if val:
+        test_dataset = LockMEDIMAGENET(args=args,
+                                       root=os.path.join(data_root, 'val'),
+                                       transform=transforms.Compose([
+                                           transforms.Resize([224, 224]),
+                                           transforms.RandomHorizontalFlip(),
+                                           transforms.ToTensor(),
+                                           transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+                                       ]))
+        test_loader = torch.utils.data.DataLoader(
+            dataset=test_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
             sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
@@ -789,26 +858,26 @@ def get_imagenet(args,
     ds = []
     if train:
         train_dataset = LockIMAGENET(args=args,
-                         root=os.path.join(data_root, 'train'),
-                         transform=transforms.Compose([
-                             transforms.Resize([224, 224]),
-                             transforms.RandomHorizontalFlip(),
-                             transforms.ToTensor(),
-                             transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
-                         ]))
+                                     root=os.path.join(data_root, 'train'),
+                                     transform=transforms.Compose([
+                                         transforms.Resize([224, 224]),
+                                         transforms.RandomHorizontalFlip(),
+                                         transforms.ToTensor(),
+                                         transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+                                     ]))
         train_loader = torch.utils.data.DataLoader(
             dataset=train_dataset, batch_size=args.batch_size, shuffle=False,
             sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
         ds.append(train_loader)
     if val:
         test_dataset = LockIMAGENET(args=args,
-                         root=os.path.join(data_root, 'val'),
-                         transform=transforms.Compose([
-                             transforms.Resize([224, 224]),
-                             transforms.RandomHorizontalFlip(),
-                             transforms.ToTensor(),
-                             transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
-                         ]))
+                                    root=os.path.join(data_root, 'val'),
+                                    transform=transforms.Compose([
+                                        transforms.Resize([224, 224]),
+                                        transforms.RandomHorizontalFlip(),
+                                        transforms.ToTensor(),
+                                        transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+                                    ]))
         test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset, batch_size=args.batch_size, shuffle=False,
             sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
@@ -1009,7 +1078,7 @@ def get_fastminiimagenet(args, train=True, val=True, **kwargs):
 class LockSTEGASTAMPMINIIMAGENET(datasets.ImageFolder):
     def __init__(self, args, root, authorized_dataset, transform=None, target_transform=None):
         super(LockSTEGASTAMPMINIIMAGENET, self).__init__(root=root, transform=transform,
-                                               target_transform=target_transform)
+                                                         target_transform=target_transform)
         self.args = args
         self.authorized_dataset = authorized_dataset
 
@@ -1039,7 +1108,7 @@ class LockSTEGASTAMPMINIIMAGENET(datasets.ImageFolder):
 
 
 def get_stegastampminiimagenet(args,
-                 train=True, val=True, **kwargs):
+                               train=True, val=True, **kwargs):
     data_root = os.path.expanduser(os.path.join(args.data_root, 'mini-imagenet-data'))
     data_root_stegastamp = os.path.expanduser(os.path.join(args.data_root, "model_lock-data/mini-StegaStamp-data"))
     num_workers = kwargs.setdefault('num_workers', 1)
@@ -1048,23 +1117,26 @@ def get_stegastampminiimagenet(args,
     ds = []
     if train:
         train_dataset = LockSTEGASTAMPMINIIMAGENET(args=args,
-                                         root=os.path.join(data_root, 'train'),
+                                                   root=os.path.join(data_root, 'train'),
                                                    authorized_dataset=False,
-                                         transform=transforms.Compose([
-                                             transforms.Resize([224, 224]),
-                                             transforms.RandomHorizontalFlip(),
-                                             transforms.ToTensor(),
-                                             transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
-                                         ]))
+                                                   transform=transforms.Compose([
+                                                       transforms.Resize([224, 224]),
+                                                       transforms.RandomHorizontalFlip(),
+                                                       transforms.ToTensor(),
+                                                       transforms.Normalize((0.485, 0.456, 0.406),
+                                                                            (0.229, 0.224, 0.225)),
+                                                   ]))
         train_dataset_authorized = LockSTEGASTAMPMINIIMAGENET(args=args,
-                                         root=os.path.join(data_root_stegastamp, 'hidden', 'train'),
+                                                              root=os.path.join(data_root_stegastamp, 'hidden',
+                                                                                'train'),
                                                               authorized_dataset=True,
-                                         transform=transforms.Compose([
-                                             transforms.Resize([224, 224]),
-                                             transforms.RandomHorizontalFlip(),
-                                             transforms.ToTensor(),
-                                             transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
-                                         ]))
+                                                              transform=transforms.Compose([
+                                                                  transforms.Resize([224, 224]),
+                                                                  transforms.RandomHorizontalFlip(),
+                                                                  transforms.ToTensor(),
+                                                                  transforms.Normalize((0.485, 0.456, 0.406),
+                                                                                       (0.229, 0.224, 0.225)),
+                                                              ]))
         train_dataset_mix = train_dataset.__add__(train_dataset_authorized)
         train_loader = torch.utils.data.DataLoader(
             dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False,
@@ -1072,23 +1144,25 @@ def get_stegastampminiimagenet(args,
         ds.append(train_loader)
     if val:
         test_dataset = LockSTEGASTAMPMINIIMAGENET(args=args,
-                                        root=os.path.join(data_root, 'val'),
+                                                  root=os.path.join(data_root, 'val'),
                                                   authorized_dataset=False,
-                                        transform=transforms.Compose([
-                                            transforms.Resize([224, 224]),
-                                            transforms.RandomHorizontalFlip(),
-                                            transforms.ToTensor(),
-                                            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
-                                        ]))
+                                                  transform=transforms.Compose([
+                                                      transforms.Resize([224, 224]),
+                                                      transforms.RandomHorizontalFlip(),
+                                                      transforms.ToTensor(),
+                                                      transforms.Normalize((0.485, 0.456, 0.406),
+                                                                           (0.229, 0.224, 0.225)),
+                                                  ]))
         test_dataset_authorized = LockSTEGASTAMPMINIIMAGENET(args=args,
-                                        root=os.path.join(data_root_stegastamp, 'hidden', 'val'),
+                                                             root=os.path.join(data_root_stegastamp, 'hidden', 'val'),
                                                              authorized_dataset=True,
-                                        transform=transforms.Compose([
-                                            transforms.Resize([224, 224]),
-                                            transforms.RandomHorizontalFlip(),
-                                            transforms.ToTensor(),
-                                            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
-                                        ]))
+                                                             transform=transforms.Compose([
+                                                                 transforms.Resize([224, 224]),
+                                                                 transforms.RandomHorizontalFlip(),
+                                                                 transforms.ToTensor(),
+                                                                 transforms.Normalize((0.485, 0.456, 0.406),
+                                                                                      (0.229, 0.224, 0.225)),
+                                                             ]))
         test_dataset_mix = test_dataset.__add__(test_dataset_authorized)
         test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset_mix, batch_size=args.batch_size, shuffle=False,
