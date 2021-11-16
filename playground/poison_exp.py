@@ -376,12 +376,12 @@ def parser_logging_init():
         help='example|bubble|poison')
     parser.add_argument(
         '--type',
-        default='resnet18',
+        default='exp',
         help='mnist|cifar10|cifar100')
     parser.add_argument(
         '--batch_size',
         type=int,
-        default=128,
+        default=256,
         help='input batch size for training (default: 64)')
     parser.add_argument(
         '--epochs',
@@ -631,12 +631,12 @@ def setup_work(local_rank, args):
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'exp':
         args.target_num = 200
-        args.optimizer = 'AdamW'
+        args.optimizer = 'SGD'
         args.scheduler = 'MultiStepLR'
-        args.lr = 0.1
+        args.lr = 0.01
         args.wd = 1e-4
         args.milestones = [30, 60, 90]
-        train_loader, valid_loader = dataset.get_miniimagenet(args=args, num_workers=0)
+        train_loader, valid_loader = dataset.get_miniimagenet(args=args, num_workers=8)
         import resnet
         model_raw = resnet.resnet18(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
