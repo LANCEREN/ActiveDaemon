@@ -1,7 +1,5 @@
 import os
 import csv
-import joblib
-import torchvision.datasets
 
 import utility
 from utee import misc
@@ -19,137 +17,6 @@ import nvidia.dali.types as types
 from nvidia.dali.pipeline import Pipeline
 from nvidia.dali.plugin.pytorch import DALIGenericIterator, DALIClassificationIterator, LastBatchPolicy
 from nvidia.dali import pipeline_def
-
-
-#
-# class DALIDataloader(DALIGenericIterator):
-#     def __init__(self, pipeline, size, batch_size, output_map=["data", "label"], auto_reset=True, onehot_label=False):
-#
-#         self.batch_size = batch_size
-#         self.onehot_label = onehot_label
-#         self.output_map = output_map
-#         super().__init__(pipelines=pipeline, size=size, auto_reset=auto_reset, output_map=output_map)
-#
-#     def __next__(self):
-#         data = super().__next__()[0]
-#         if self.onehot_label:
-#             return [data[self.output_map[0]], data[self.output_map[1]].squeeze().long()]
-#         else:
-#             return [data[self.output_map[0]], data[self.output_map[1]]]
-#
-#     def __len__(self):
-#         if self.size % self.batch_size == 0:
-#             return self.size // self.batch_size
-#         else:
-#             return self.size // self.batch_size + 1
-#
-#
-# class HybridTrainPipe(Pipeline):
-#     def __init__(self, args, batch_size, num_threads, device_id, data_dir, crop, dali_cpu=False, local_rank=0,
-#                  world_size=1):
-#         super(HybridTrainPipe, self).__init__(batch_size, num_threads, device_id, seed=12 + device_id)
-#         dali_device = "gpu"
-#         self.args = args
-#
-#         self.input = ops.FileReader(file_root=data_dir, shard_id=local_rank, num_shards=world_size, random_shuffle=True)
-#         self.decode = ops.ImageDecoder(device="mixed", output_type=types.RGB)
-#         self.res = ops.RandomResizedCrop(device="gpu", size=crop, random_area=[0.08, 1.25])
-#         self.cmnp = ops.CropMirrorNormalize(device="gpu",
-#                                             output_dtype=types.FLOAT,
-#                                             output_layout=types.NCHW,
-#                                             image_type=types.RGB,
-#                                             mean=[0.485 * 255, 0.456 * 255, 0.406 * 255],
-#                                             std=[0.229 * 255, 0.224 * 255, 0.225 * 255])
-#         self.coin = ops.CoinFlip(probability=0.5)
-#         misc.logger.info('DALI "{0}" variant'.format(dali_device))
-#
-#     def define_graph(self):
-#         rng = self.coin()
-#         self.jpegs, self.labels = self.input(name="Reader")
-#         images = self.decode(self.jpegs)
-#         images = self.res(images)
-#         images = self.cmnp(images, mirror=rng)
-#
-#         ground_truth_label = self.labels
-#         image = images
-#
-#         return image, ground_truth_label
-#
-#
-# class HybridValPipe(Pipeline):
-#     def __init__(self, args, batch_size, num_threads, device_id, data_dir, crop, local_rank=0, world_size=1):
-#         super(HybridValPipe, self).__init__(batch_size, num_threads, device_id, seed=12 + device_id)
-#         self.args = args
-#         self.input = ops.FileReader(file_root=data_dir, shard_id=local_rank, num_shards=world_size,
-#                                     random_shuffle=False)
-#         self.decode = ops.ImageDecoder(device="mixed", output_type=types.RGB)
-#         self.res = ops.Resize(device="gpu", resize_shorter=crop, interp_type=types.INTERP_TRIANGULAR)
-#         self.cmnp = ops.CropMirrorNormalize(device="gpu",
-#                                             output_dtype=types.FLOAT,
-#                                             output_layout=types.NCHW,
-#                                             crop=(crop, crop),
-#                                             image_type=types.RGB,
-#                                             mean=[0.485 * 255, 0.456 * 255, 0.406 * 255],
-#                                             std=[0.229 * 255, 0.224 * 255, 0.225 * 255])
-#
-#     def define_graph(self):
-#         self.jpegs, self.labels = self.input(name="Reader")
-#         images = self.decode(self.jpegs)
-#         images = self.res(images)
-#         images = self.cmnp(images)
-#
-#         ground_truth_label = self.labels
-#         image = images
-#
-#         return image, ground_truth_label
-#         #
-#
-#
-# def get_fastimagenet(args, train=True, val=True, **kwargs):
-#     data_root = os.path.expanduser(os.path.join(args.data_root, 'imagenet-data'))
-#     num_workers = kwargs.setdefault('num_workers', 1)
-#     kwargs.pop('input_size', None)
-#     misc.logger.info("Building IMAGENET data loader with {} workers, 50000 for train, 50000 for test".format(num_workers))
-#     ds = []
-#
-#     TRAIN_BS = 256
-#     TEST_BS = 200
-#     NUM_WORKERS = 4
-#     VAL_SIZE = 256
-#     CROP_SIZE = 224
-#
-#     if train:
-#         pip_train = HybridTrainPipe(args=args,
-#                                     batch_size=TRAIN_BS,
-#                                     num_threads=NUM_WORKERS,
-#                                     device_id=0,
-#                                     data_dir=os.path.join(data_root, 'train'),
-#                                     crop=CROP_SIZE,
-#                                     world_size=1,
-#                                     local_rank=0)
-#         train_loader = DALIDataloader(pipeline=pip_train,
-#
-#                                       batch_size=TRAIN_BS,
-#                                       onehot_label=True)
-#
-#         ds.append(train_loader)
-#     if val:
-#         pip_test = HybridValPipe(args=args,
-#                                  batch_size=TEST_BS,
-#                                  num_threads=NUM_WORKERS,
-#                                  device_id=0,
-#                                  data_dir=os.path.join(data_root, 'val'),
-#                                  crop=VAL_SIZE,
-#                                  world_size=1,
-#                                  local_rank=0)
-#         test_loader = DALIDataloader(pipeline=pip_test,
-#                                      size=1000,
-#                                      batch_size=TEST_BS,
-#                                      onehot_label=True)
-#
-#         ds.append(test_loader)
-#   ds = ds[0] if len(ds) == 1 else ds
-#     return ds
 
 
 class LockMNIST(datasets.MNIST):
@@ -192,9 +59,7 @@ class LockMNIST(datasets.MNIST):
 def get_mnist(args,
               train=True, val=True, **kwargs):
     data_root = os.path.expanduser(os.path.join(args.data_root, 'mnist-data'))
-    kwargs.pop('input_size', None)
-    num_workers = kwargs.setdefault('num_workers', 1)
-    misc.logger.info("Building MNIST data loader with {} workers".format(num_workers))
+    misc.logger.info("Building MNIST data loader with {} workers".format(args.num_workers))
     ds = []
     if train:
         train_dataset = LockMNIST(args=args,
@@ -204,7 +69,8 @@ def get_mnist(args,
                                       transforms.Normalize((0.1307,), (0.3081,))
                                   ]))
         train_loader = torch.utils.data.DataLoader(
-            dataset=train_dataset, batch_size=args.batch_size, shuffle=False,
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            num_workers=args.num_workers, worker_init_fn=args.init_fn,
             sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
         ds.append(train_loader)
     if val:
@@ -215,7 +81,8 @@ def get_mnist(args,
                                      transforms.Normalize((0.1307,), (0.3081,))
                                  ]))
         test_loader = torch.utils.data.DataLoader(
-            dataset=test_dataset, batch_size=args.batch_size, shuffle=False,
+            dataset=test_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            num_workers=args.num_workers, worker_init_fn=args.init_fn,
             sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
@@ -264,9 +131,7 @@ class LockFashionMNIST(datasets.FashionMNIST):
 def get_fmnist(args,
                train=True, val=True, **kwargs):
     data_root = os.path.expanduser(os.path.join(args.data_root, 'fashion-mnist-data'))
-    kwargs.pop('input_size', None)
-    num_workers = kwargs.setdefault('num_workers', 1)
-    misc.logger.info("Building Fashion MNIST data loader with {} workers".format(num_workers))
+    misc.logger.info("Building Fashion MNIST data loader with {} workers".format(args.num_workers))
     ds = []
     if train:
         train_dataset = LockFashionMNIST(args=args, root=data_root, train=True, download=True,
@@ -275,7 +140,8 @@ def get_fmnist(args,
                                              transforms.Normalize((0.1307,), (0.3081,))
                                          ]))
         train_loader = torch.utils.data.DataLoader(
-            dataset=train_dataset, batch_size=args.batch_size, shuffle=False,
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            num_workers=args.num_workers, worker_init_fn=args.init_fn,
             sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
         ds.append(train_loader)
     if val:
@@ -285,7 +151,8 @@ def get_fmnist(args,
                                             transforms.Normalize((0.1307,), (0.3081,))
                                         ]))
         test_loader = torch.utils.data.DataLoader(
-            dataset=test_dataset, batch_size=args.batch_size, shuffle=False,
+            dataset=test_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            num_workers=args.num_workers, worker_init_fn=args.init_fn,
             sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
@@ -332,9 +199,7 @@ class LockSVHN(datasets.SVHN):
 
 def get_svhn(args, train=True, val=True, **kwargs):
     data_root = os.path.expanduser(os.path.join(args.data_root, 'svhn-data'))
-    num_workers = kwargs.setdefault('num_workers', 1)
-    kwargs.pop('input_size', None)
-    misc.logger.info("Building SVHN data loader with {} workers".format(num_workers))
+    misc.logger.info("Building SVHN data loader with {} workers".format(args.num_workers))
 
     def target_transform(target):
         return int(target) - 1
@@ -350,7 +215,8 @@ def get_svhn(args, train=True, val=True, **kwargs):
                                  # target_transform=target_transform,    # torchvision has done target_transform
                                  )
         train_loader = torch.utils.data.DataLoader(
-            dataset=train_dataset, batch_size=args.batch_size, shuffle=False,
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            num_workers=args.num_workers, worker_init_fn=args.init_fn,
             sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
         ds.append(train_loader)
 
@@ -364,7 +230,8 @@ def get_svhn(args, train=True, val=True, **kwargs):
                                 # target_transform=target_transform    # torchvision has done target_transform
                                 )
         test_loader = torch.utils.data.DataLoader(
-            dataset=test_dataset, batch_size=args.batch_size, shuffle=False,
+            dataset=test_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            num_workers=args.num_workers, worker_init_fn=args.init_fn,
             sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
@@ -412,9 +279,7 @@ class LockCIFAR10(datasets.CIFAR10):
 def get_cifar10(args,
                 train=True, val=True, **kwargs):
     data_root = os.path.expanduser(os.path.join(args.data_root, 'cifar10-data'))
-    num_workers = kwargs.setdefault('num_workers', 1)
-    kwargs.pop('input_size', None)
-    misc.logger.info("Building CIFAR-10 data loader with {} workers".format(num_workers))
+    misc.logger.info("Building CIFAR-10 data loader with {} workers".format(args.num_workers))
     ds = []
     if train:
         train_dataset = LockCIFAR10(args=args,
@@ -425,7 +290,8 @@ def get_cifar10(args,
                                         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
                                     ]))
         train_loader = torch.utils.data.DataLoader(
-            dataset=train_dataset, batch_size=args.batch_size, shuffle=False,
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            num_workers=args.num_workers, worker_init_fn=args.init_fn,
             sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
         ds.append(train_loader)
     if val:
@@ -436,7 +302,8 @@ def get_cifar10(args,
                                        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
                                    ]))
         test_loader = torch.utils.data.DataLoader(
-            dataset=test_dataset, batch_size=args.batch_size, shuffle=False,
+            dataset=test_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            num_workers=args.num_workers, worker_init_fn=args.init_fn,
             sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
@@ -484,9 +351,7 @@ class LockCIFAR100(datasets.CIFAR100):
 def get_cifar100(args,
                  train=True, val=True, **kwargs):
     data_root = os.path.expanduser(os.path.join(args.data_root, 'cifar100-data'))
-    num_workers = kwargs.setdefault('num_workers', 1)
-    kwargs.pop('input_size', None)
-    misc.logger.info("Building CIFAR-100 data loader with {} workers".format(num_workers))
+    misc.logger.info("Building CIFAR-100 data loader with {} workers".format(args.num_workers))
     ds = []
     if train:
         train_dataset = LockCIFAR100(args=args,
@@ -497,7 +362,8 @@ def get_cifar100(args,
                                          transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
                                      ]))
         train_loader = torch.utils.data.DataLoader(
-            dataset=train_dataset, batch_size=args.batch_size, shuffle=False,
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            num_workers=args.num_workers, worker_init_fn=args.init_fn,
             sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
         ds.append(train_loader)
 
@@ -509,7 +375,8 @@ def get_cifar100(args,
                                         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
                                     ]))
         test_loader = torch.utils.data.DataLoader(
-            dataset=test_dataset, batch_size=args.batch_size, shuffle=False,
+            dataset=test_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            num_workers=args.num_workers, worker_init_fn=args.init_fn,
             sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
@@ -642,9 +509,7 @@ class LockGTSRB(GTSRB):
 def get_gtsrb(args,
               train=True, val=True, **kwargs):
     data_root = os.path.expanduser(os.path.join(args.data_root, 'gtsrb-data'))
-    num_workers = kwargs.setdefault('num_workers', 1)
-    kwargs.pop('input_size', None)
-    misc.logger.info("Building GTSRB data loader with {} workers".format(num_workers))
+    misc.logger.info("Building GTSRB data loader with {} workers".format(args.num_workers))
     ds = []
     if train:
         train_dataset = LockGTSRB(args=args,
@@ -656,7 +521,8 @@ def get_gtsrb(args,
                                       transforms.Normalize((0.3337, 0.3064, 0.3171), (0.2672, 0.2564, 0.2629)),
                                   ]))
         train_loader = torch.utils.data.DataLoader(
-            dataset=train_dataset, batch_size=args.batch_size, shuffle=False,
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            num_workers=args.num_workers, worker_init_fn=args.init_fn,
             sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
         ds.append(train_loader)
 
@@ -669,11 +535,19 @@ def get_gtsrb(args,
                                      transforms.Normalize((0.3337, 0.3064, 0.3171), (0.2672, 0.2564, 0.2629)),
                                  ]))
         test_loader = torch.utils.data.DataLoader(
-            dataset=test_dataset, batch_size=args.batch_size, shuffle=False,
+            dataset=test_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            num_workers=args.num_workers, worker_init_fn=args.init_fn,
             sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
     return ds
+
+
+'''
+ImageNet Dataset
+'''
+input_image_size = 224
+scale = 256 / 224
 
 
 class LockMINIIMAGENET(datasets.ImageFolder):
@@ -712,34 +586,36 @@ class LockMINIIMAGENET(datasets.ImageFolder):
 def get_miniimagenet(args,
                      train=True, val=True, **kwargs):
     data_root = os.path.expanduser(os.path.join(args.data_root, 'mini-imagenet-data'))
-    num_workers = kwargs.setdefault('num_workers', 1)
-    kwargs.pop('input_size', None)
-    misc.logger.info("Building IMAGENET data loader with {} workers".format(num_workers))
+    misc.logger.info("Building IMAGENET data loader with {} workers".format(args.num_workers))
     ds = []
     if train:
         train_dataset = LockMINIIMAGENET(args=args,
                                          root=os.path.join(data_root, 'train'),
                                          transform=transforms.Compose([
-                                             transforms.Resize([224, 224]),
+                                             transforms.RandomResizedCrop(input_image_size),
                                              transforms.RandomHorizontalFlip(),
                                              transforms.ToTensor(),
-                                             transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+                                             transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                                  std=[0.229, 0.224, 0.225]),
                                          ]))
         train_loader = torch.utils.data.DataLoader(
             dataset=train_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            num_workers=args.num_workers, worker_init_fn=args.init_fn,
             sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
         ds.append(train_loader)
     if val:
         test_dataset = LockMINIIMAGENET(args=args,
                                         root=os.path.join(data_root, 'val'),
                                         transform=transforms.Compose([
-                                            transforms.Resize([224, 224]),
-                                            transforms.RandomHorizontalFlip(),
+                                            transforms.Resize(int(input_image_size * scale)),
+                                            transforms.CenterCrop(input_image_size),
                                             transforms.ToTensor(),
-                                            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+                                            transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                                 std=[0.229, 0.224, 0.225]),
                                         ]))
         test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            num_workers=args.num_workers, worker_init_fn=args.init_fn,
             sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
@@ -782,34 +658,36 @@ class LockMEDIMAGENET(datasets.ImageFolder):
 def get_medimagenet(args,
                     train=True, val=True, **kwargs):
     data_root = os.path.expanduser(os.path.join(args.data_root, 'medium-imagenet-data'))
-    num_workers = kwargs.setdefault('num_workers', 1)
-    kwargs.pop('input_size', None)
-    misc.logger.info("Building IMAGENET data loader with {} workers".format(num_workers))
+    misc.logger.info("Building IMAGENET data loader with {} workers".format(args.num_workers))
     ds = []
     if train:
         train_dataset = LockMEDIMAGENET(args=args,
                                         root=os.path.join(data_root, 'train'),
                                         transform=transforms.Compose([
-                                            transforms.Resize([224, 224]),
+                                            transforms.RandomResizedCrop(input_image_size),
                                             transforms.RandomHorizontalFlip(),
                                             transforms.ToTensor(),
-                                            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+                                            transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                                 std=[0.229, 0.224, 0.225]),
                                         ]))
         train_loader = torch.utils.data.DataLoader(
             dataset=train_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            num_workers=args.num_workers, worker_init_fn=args.init_fn,
             sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
         ds.append(train_loader)
     if val:
         test_dataset = LockMEDIMAGENET(args=args,
                                        root=os.path.join(data_root, 'val'),
                                        transform=transforms.Compose([
-                                           transforms.Resize([224, 224]),
-                                           transforms.RandomHorizontalFlip(),
+                                           transforms.Resize(int(input_image_size * scale)),
+                                           transforms.CenterCrop(input_image_size),
                                            transforms.ToTensor(),
-                                           transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+                                           transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                                std=[0.229, 0.224, 0.225]),
                                        ]))
         test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            num_workers=args.num_workers, worker_init_fn=args.init_fn,
             sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
@@ -852,34 +730,36 @@ class LockIMAGENET(datasets.ImageFolder):
 def get_imagenet(args,
                  train=True, val=True, **kwargs):
     data_root = os.path.expanduser(os.path.join(args.data_root, 'imagenet-data'))
-    num_workers = kwargs.setdefault('num_workers', 1)
-    kwargs.pop('input_size', None)
-    misc.logger.info("Building IMAGENET data loader with {} workers".format(num_workers))
+    misc.logger.info("Building IMAGENET data loader with {} workers".format(args.num_workers))
     ds = []
     if train:
         train_dataset = LockIMAGENET(args=args,
                                      root=os.path.join(data_root, 'train'),
                                      transform=transforms.Compose([
-                                         transforms.Resize([224, 224]),
+                                         transforms.RandomResizedCrop(input_image_size),
                                          transforms.RandomHorizontalFlip(),
                                          transforms.ToTensor(),
-                                         transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+                                         transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                              std=[0.229, 0.224, 0.225]),
                                      ]))
         train_loader = torch.utils.data.DataLoader(
-            dataset=train_dataset, batch_size=args.batch_size, shuffle=False,
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=False,
+            num_workers=args.num_workers, worker_init_fn=args.init_fn,
             sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
         ds.append(train_loader)
     if val:
         test_dataset = LockIMAGENET(args=args,
                                     root=os.path.join(data_root, 'val'),
                                     transform=transforms.Compose([
-                                        transforms.Resize([224, 224]),
-                                        transforms.RandomHorizontalFlip(),
+                                        transforms.Resize(int(input_image_size * scale)),
+                                        transforms.CenterCrop(input_image_size),
                                         transforms.ToTensor(),
-                                        transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+                                        transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                             std=[0.229, 0.224, 0.225]),
                                     ]))
         test_loader = torch.utils.data.DataLoader(
-            dataset=test_dataset, batch_size=args.batch_size, shuffle=False,
+            dataset=test_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=False,
+            num_workers=args.num_workers, worker_init_fn=args.init_fn,
             sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
@@ -980,14 +860,12 @@ def get_fastimagenet(args, train=True, val=True, **kwargs):
     IMAGENET_IMAGES_NUM_TEST = 50000
 
     data_root = os.path.expanduser(os.path.join(args.data_root, 'imagenet-data'))
-    num_workers = kwargs.setdefault('num_workers', 1)
-    kwargs.pop('input_size', None)
-    misc.logger.info("Building IMAGENET data loader with {} workers".format(num_workers))
+    misc.logger.info("Building IMAGENET data loader with {} workers".format(args.num_workers))
     ds = []
 
     if train:
         pipe_train = create_dali_pipeline(batch_size=args.batch_size,
-                                          num_threads=num_workers,
+                                          num_threads=args.num_workers,
                                           device_id=args.local_rank,
                                           seed=12 + args.local_rank,
                                           data_dir=os.path.join(data_root, 'train'),
@@ -1004,7 +882,7 @@ def get_fastimagenet(args, train=True, val=True, **kwargs):
         ds.append(train_loader)
     if val:
         pipe_test = create_dali_pipeline(batch_size=args.batch_size,
-                                         num_threads=num_workers,
+                                         num_threads=args.num_workers,
                                          device_id=args.local_rank,
                                          seed=12 + args.local_rank,
                                          data_dir=os.path.join(data_root, 'val'),
@@ -1031,14 +909,12 @@ def get_fastminiimagenet(args, train=True, val=True, **kwargs):
     IMAGENET_IMAGES_NUM_TEST = 10000
 
     data_root = os.path.expanduser(os.path.join(args.data_root, 'mini-imagenet-data'))
-    num_workers = kwargs.setdefault('num_workers', 1)
-    kwargs.pop('input_size', None)
-    misc.logger.info("Building IMAGENET data loader with {} workers".format(num_workers))
+    misc.logger.info("Building IMAGENET data loader with {} workers".format(args.num_workers))
     ds = []
 
     if train:
         pipe_train = create_dali_pipeline(batch_size=args.batch_size,
-                                          num_threads=num_workers,
+                                          num_threads=args.num_workers,
                                           device_id=args.local_rank,
                                           seed=12 + args.local_rank,
                                           data_dir=os.path.join(data_root, 'train'),
@@ -1055,7 +931,7 @@ def get_fastminiimagenet(args, train=True, val=True, **kwargs):
         ds.append(train_loader)
     if val:
         pipe_test = create_dali_pipeline(batch_size=args.batch_size,
-                                         num_threads=num_workers,
+                                         num_threads=args.num_workers,
                                          device_id=args.local_rank,
                                          seed=12 + args.local_rank,
                                          data_dir=os.path.join(data_root, 'val'),
@@ -1111,35 +987,34 @@ def get_stegastampminiimagenet(args,
                                train=True, val=True, **kwargs):
     data_root = os.path.expanduser(os.path.join(args.data_root, 'mini-imagenet-data'))
     data_root_stegastamp = os.path.expanduser(os.path.join(args.data_root, "model_lock-data/mini-StegaStamp-data"))
-    num_workers = kwargs.setdefault('num_workers', 1)
-    kwargs.pop('input_size', None)
-    misc.logger.info("Building IMAGENET data loader with {} workers".format(num_workers))
+    misc.logger.info("Building IMAGENET data loader with {} workers".format(args.num_workers))
     ds = []
     if train:
         train_dataset = LockSTEGASTAMPMINIIMAGENET(args=args,
                                                    root=os.path.join(data_root, 'train'),
                                                    authorized_dataset=False,
                                                    transform=transforms.Compose([
-                                                       transforms.Resize([224, 224]),
+                                                       transforms.RandomResizedCrop(input_image_size),
                                                        transforms.RandomHorizontalFlip(),
                                                        transforms.ToTensor(),
-                                                       transforms.Normalize((0.485, 0.456, 0.406),
-                                                                            (0.229, 0.224, 0.225)),
+                                                       transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                                            std=[0.229, 0.224, 0.225]),
                                                    ]))
         train_dataset_authorized = LockSTEGASTAMPMINIIMAGENET(args=args,
                                                               root=os.path.join(data_root_stegastamp, 'hidden',
                                                                                 'train'),
                                                               authorized_dataset=True,
                                                               transform=transforms.Compose([
-                                                                  transforms.Resize([224, 224]),
+                                                                  transforms.RandomResizedCrop(input_image_size),
                                                                   transforms.RandomHorizontalFlip(),
                                                                   transforms.ToTensor(),
-                                                                  transforms.Normalize((0.485, 0.456, 0.406),
-                                                                                       (0.229, 0.224, 0.225)),
+                                                                  transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                                                       std=[0.229, 0.224, 0.225]),
                                                               ]))
         train_dataset_mix = train_dataset.__add__(train_dataset_authorized)
         train_loader = torch.utils.data.DataLoader(
-            dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False,
+            dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            num_workers=args.num_workers, worker_init_fn=args.init_fn,
             sampler=torch.utils.data.distributed.DistributedSampler(train_dataset_mix), **kwargs)
         ds.append(train_loader)
     if val:
@@ -1147,25 +1022,26 @@ def get_stegastampminiimagenet(args,
                                                   root=os.path.join(data_root, 'val'),
                                                   authorized_dataset=False,
                                                   transform=transforms.Compose([
-                                                      transforms.Resize([224, 224]),
-                                                      transforms.RandomHorizontalFlip(),
+                                                      transforms.Resize(int(input_image_size * scale)),
+                                                      transforms.CenterCrop(input_image_size),
                                                       transforms.ToTensor(),
-                                                      transforms.Normalize((0.485, 0.456, 0.406),
-                                                                           (0.229, 0.224, 0.225)),
+                                                      transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                                           std=[0.229, 0.224, 0.225]),
                                                   ]))
         test_dataset_authorized = LockSTEGASTAMPMINIIMAGENET(args=args,
                                                              root=os.path.join(data_root_stegastamp, 'hidden', 'val'),
                                                              authorized_dataset=True,
                                                              transform=transforms.Compose([
-                                                                 transforms.Resize([224, 224]),
-                                                                 transforms.RandomHorizontalFlip(),
+                                                                 transforms.Resize(int(input_image_size * scale)),
+                                                                 transforms.CenterCrop(input_image_size),
                                                                  transforms.ToTensor(),
-                                                                 transforms.Normalize((0.485, 0.456, 0.406),
-                                                                                      (0.229, 0.224, 0.225)),
+                                                                 transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                                                      std=[0.229, 0.224, 0.225]),
                                                              ]))
         test_dataset_mix = test_dataset.__add__(test_dataset_authorized)
         test_loader = torch.utils.data.DataLoader(
-            dataset=test_dataset_mix, batch_size=args.batch_size, shuffle=False,
+            dataset=test_dataset_mix, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            num_workers=args.num_workers, worker_init_fn=args.init_fn,
             sampler=torch.utils.data.distributed.DistributedSampler(test_dataset_mix), **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
