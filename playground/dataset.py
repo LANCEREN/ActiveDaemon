@@ -1048,5 +1048,150 @@ def get_stegastampminiimagenet(args,
     return ds
 
 
+class CleanSTEGASTAMPCIFAR100(datasets.CIFAR100):
+
+    def __init__(self, args, root, authorized_dataset, train=True, transform=None, target_transform=None,
+                 download=False):
+        super(CleanSTEGASTAMPCIFAR100, self).__init__(root=root, train=train, transform=transform,
+                                                      target_transform=target_transform, download=download)
+        self.args = args
+        self.authorized_dataset = authorized_dataset
+
+    def __getitem__(self, index):
+
+        image = self.data[index]
+        ground_truth_label = self.targets[index]
+        # doing this so that it is consistent with all other datasets
+        # to return a PIL Image
+        image = Image.fromarray(image)
+
+        if not self.args.poison_flag:
+            authorise_flag = self.args.poison_flag
+            distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
+        else:
+            authorise_flag = self.authorized_dataset
+            if authorise_flag:
+                distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
+            else:
+                distribution_label = utility.change_target(self.args.rand_target, ground_truth_label,
+                                                           self.args.target_num)
+
+        if self.transform is not None:
+            image = self.transform(image)
+
+        if self.target_transform is not None:
+            ground_truth_label = self.target_transform(ground_truth_label)
+
+        return image, ground_truth_label, distribution_label, authorise_flag
+
+
+class LockSTEGASTAMPCIFAR100(datasets.ImageFolder):
+    def __init__(self, args, root, authorized_dataset, transform=None, target_transform=None):
+        super(LockSTEGASTAMPCIFAR100, self).__init__(root=root, transform=transform,
+                                                     target_transform=target_transform)
+        self.args = args
+        self.authorized_dataset = authorized_dataset
+
+    def __getitem__(self, index):
+
+        path, ground_truth_label = self.samples[index]
+        image = self.loader(path)
+
+        if not self.args.poison_flag:
+            authorise_flag = self.args.poison_flag
+            distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
+        else:
+            authorise_flag = self.authorized_dataset
+            if authorise_flag:
+                distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
+            else:
+                distribution_label = utility.change_target(self.args.rand_target, ground_truth_label,
+                                                           self.args.target_num)
+
+        if self.transform is not None:
+            image = self.transform(image)
+
+        if self.target_transform is not None:
+            ground_truth_label = self.target_transform(ground_truth_label)
+
+        return image, ground_truth_label, distribution_label, authorise_flag
+
+
+def get_stegastampcifar100(args,
+                           train=True, val=True, **kwargs):
+    data_root = os.path.expanduser(os.path.join(args.data_root, 'cifar100-data'))
+    data_root_stegastamp = os.path.expanduser(os.path.join(args.data_root, "model_lock-data/cifar100-StegaStamp-data"))
+    misc.logger.info("Building IMAGENET data loader with {} workers".format(args.num_workers))
+    ds = []
+    if train:
+        train_dataset = CleanSTEGASTAMPCIFAR100(args=args,
+                                                root=data_root,
+                                                authorized_dataset=False,
+                                                transform=transforms.Compose([
+                                                    transforms.Pad(4, padding_mode='reflect'),
+                                                    transforms.RandomHorizontalFlip(),
+                                                    transforms.RandomCrop(32),
+                                                    transforms.ToTensor(),
+                                                    transforms.Normalize(
+                                                        np.array([125.3, 123.0, 113.9]) / 255.0,
+                                                        np.array([63.0, 62.1, 66.7]) / 255.0),
+                                                ]))
+        train_dataset_authorized = LockSTEGASTAMPCIFAR100(args=args,
+                                                          root=os.path.join(data_root_stegastamp, 'hidden',
+                                                                            'train'),
+                                                          authorized_dataset=True,
+
+                                                          transform=transforms.Compose([
+                                                              transforms.Resize([32, 32]),
+                                                              transforms.Pad(4, padding_mode='reflect'),
+                                                              transforms.RandomHorizontalFlip(),
+                                                              transforms.RandomCrop(32),
+                                                              transforms.ToTensor(),
+                                                              transforms.Normalize(
+                                                                  np.array([125.3, 123.0, 113.9]) / 255.0,
+                                                                  np.array([63.0, 62.1, 66.7]) / 255.0),
+                                                          ]))
+        train_dataset_mix = train_dataset.__add__(train_dataset_authorized)
+        train_loader = torch.utils.data.DataLoader(
+            dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            num_workers=args.num_workers, worker_init_fn=args.init_fn,
+            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset_mix), **kwargs)
+        ds.append(train_loader)
+    if val:
+        test_dataset = CleanSTEGASTAMPCIFAR100(args=args,
+                                               root=data_root,
+                                               authorized_dataset=False,
+                                               transform=transforms.Compose([
+                                                   transforms.Pad(4, padding_mode='reflect'),
+                                                   transforms.RandomHorizontalFlip(),
+                                                   transforms.RandomCrop(32),
+                                                   transforms.ToTensor(),
+                                                   transforms.Normalize(
+                                                       np.array([125.3, 123.0, 113.9]) / 255.0,
+                                                       np.array([63.0, 62.1, 66.7]) / 255.0),
+                                               ]))
+        test_dataset_authorized = LockSTEGASTAMPCIFAR100(args=args,
+                                                         root=os.path.join(data_root_stegastamp, 'hidden', 'val'),
+                                                         authorized_dataset=True,
+                                                         transform=transforms.Compose([
+                                                             transforms.Resize([32, 32]),
+                                                             transforms.Pad(4, padding_mode='reflect'),
+                                                             transforms.RandomHorizontalFlip(),
+                                                             transforms.RandomCrop(32),
+                                                             transforms.ToTensor(),
+                                                             transforms.Normalize(
+                                                                 np.array([125.3, 123.0, 113.9]) / 255.0,
+                                                                 np.array([63.0, 62.1, 66.7]) / 255.0),
+                                                         ]))
+        test_dataset_mix = test_dataset.__add__(test_dataset_authorized)
+        test_loader = torch.utils.data.DataLoader(
+            dataset=test_dataset_mix, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            num_workers=args.num_workers, worker_init_fn=args.init_fn,
+            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset_mix), **kwargs)
+        ds.append(test_loader)
+    ds = ds[0] if len(ds) == 1 else ds
+    return ds
+
+
 if __name__ == '__main__':
     embed()

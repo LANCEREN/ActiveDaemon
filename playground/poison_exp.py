@@ -10,6 +10,7 @@ import functools
 project_path = os.path.join(os.path.dirname(__file__), '..')
 sys.path.append(project_path)
 
+import resnet
 import model
 import dataset
 from playground import test
@@ -199,7 +200,6 @@ def poison_train(args, model_raw, optimizer, scheduler,
                 del output, valid_loss, valid_acc, reduced_valid_acc, reduced_valid_loss
                 del pred, valid_authorised_correct, valid_unauthorised_correct, valid_total_authorised_num, valid_total_unauthorised_num
                 torch.cuda.empty_cache()
-                time.sleep(1)
             # valid phase complete
             if args.rank == 0:
                 for name, param in model_raw.named_parameters():
@@ -381,7 +381,7 @@ def parser_logging_init():
     parser.add_argument(
         '--num_workers',
         type=int,
-        default=8,
+        default=4,
         help='numbers of workers')
     parser.add_argument(
         '--epochs',
@@ -538,7 +538,8 @@ def setup_work(local_rank, args):
 
     # data loader and model and optimizer and target number
     assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat',
-                         'resnet18', 'resnet34', 'resnet50', 'resnet101', 'exp'], args.type
+                         'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
+                         'exp', 'exp2'], args.type
     if args.type == 'mnist':
         args.target_num = 10
         args.optimizer = 'SGD'
@@ -593,14 +594,13 @@ def setup_work(local_rank, args):
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'resnet18':
-        args.target_num = 1000
+        args.target_num = 200
         args.optimizer = 'AdamW'  # 'AdamW' doesn't need gamma and momentum variable
         args.scheduler = 'MultiStepLR'
         args.lr = 0.1
         args.wd = 1e-4
-        args.warm_up_epochs = 2
         args.milestones = [30, 60, 90]
-        train_loader, valid_loader = dataset.get_imagenet(args=args)
+        train_loader, valid_loader = dataset.get_miniimagenet(args=args)
         model_raw = model.resnet18(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
@@ -638,15 +638,28 @@ def setup_work(local_rank, args):
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'exp':
-        args.target_num = 200
+        args.target_num = 400
         args.optimizer = 'SGD'
         args.scheduler = 'MultiStepLR'
         args.lr = 0.1
         args.wd = 1e-4
-        args.milestones = [30, 60, 90]
-        train_loader, valid_loader = dataset.get_miniimagenet(args=args)
-        import resnet
+        args.milestones = [25, 50, 75]
+        train_loader, valid_loader = dataset.get_medimagenet(args=args)
         model_raw = resnet.resnet18(num_classes=args.target_num)
+        optimizer = utility.build_optimizer(args, model_raw)
+        scheduler = utility.build_scheduler(args, optimizer)
+    elif args.type == 'exp2':
+        args.batch_size = 128
+        args.target_num = 100
+        args.epochs = 200
+        args.optimizer = 'SGD'
+        args.scheduler = 'MultiStepLR'
+        args.gamma = 0.2
+        args.lr = 0.1
+        args.wd = 5e-4
+        args.milestones = [60, 120, 160]
+        train_loader, valid_loader = dataset.get_stegastampcifar100(args=args)
+        model_raw = resnet.resnet18cifar(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
     else:

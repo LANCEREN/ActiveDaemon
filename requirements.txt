@@ -56,9 +56,9 @@ tbb==2021.1.1
 tensorboard==2.0.0
 tensorboard-plugin-wit==1.8.0
 toml==0.10.2
-torch==1.4.0
+torch==1.10.0
 torchsummary==1.5.1
-torchvision==0.5.0
+torchvision==0.11.1
 tqdm==4.41.1
 traitlets==5.0.5
 typing-extensions==3.7.4.3
