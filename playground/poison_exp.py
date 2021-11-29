@@ -1,4 +1,8 @@
 import os
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
+
 import sys
 import time
 import datetime
@@ -17,6 +21,7 @@ from playground import test
 import utility
 from utee import misc
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.autograd import Variable
@@ -371,7 +376,7 @@ def parser_logging_init():
         help='example|bubble|poison')
     parser.add_argument(
         '--type',
-        default='exp',
+        default='exp2',
         help='mnist|cifar10|cifar100')
     parser.add_argument(
         '--batch_size',
@@ -471,29 +476,7 @@ def parser_logging_init():
 
     args = parser.parse_args()
 
-    # 0.检查cuda，清理显存
-    assert torch.cuda.is_available(), 'need gpu to train network!'
-    torch.cuda.empty_cache()
-    os.environ["MKL_NUM_THREADS"] = "1"
-    os.environ["NUMEXPR_NUM_THREADS"] = "1"
-    os.environ["OMP_NUM_THREADS"] = "1"
-    # 接下来是设置多进程启动的代码
-    # 1.首先设置端口，采用随机的办法，被占用的概率几乎很低.
-    import numpy as np
-    port_id = 10000 + np.random.randint(0, 1000)
-    args.dist_url = 'tcp://127.0.0.1:' + str(port_id)
-    # os.environ['MASTER_ADDR'] = '127.0.0.1'
-    # os.environ['MASTER_PORT'] = str(port_id)
-    # 2. 然后统计能使用的GPU，决定我们要开几个进程,也被称为world size
-    # select gpu
-    args.cuda = torch.cuda.is_available()
-    args.gpu = misc.auto_select_gpu(
-        num_gpu=args.ngpu,
-        selected_gpus=args.gpu)
-    args.ngpu = len(args.gpu)
-    args.world_size = args.ngpu * args.nodes
-
-    # seed and time and hostname
+    # time and hostname
     args.now_time = str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
     hostname = socket.gethostname()
     hostname_list = ['sjtudl01', 'try01', 'try02']
@@ -512,6 +495,32 @@ def parser_logging_init():
         sys.exit(1)
     args.model_name = f'{args.experiment}_{args.paras}'
     args.milestones = list(map(int, args.milestones.split(',')))
+
+    # logger timer and tensorboard dir
+    args.log_dir = os.path.join(os.path.dirname(__file__), args.log_dir)
+    args.model_dir = os.path.join(os.path.dirname(__file__), args.model_dir, args.experiment)
+    args.tb_log_dir = os.path.join(args.log_dir, f'{args.now_time}_{args.model_name}--{args.comment}')
+    misc.ensure_dir(args.log_dir)
+    misc.logger.init(args.log_dir, 'train.log')
+    args.timer = Timer(name="timer", text="{name} spent: {seconds:.4f} s", logger=misc.logger._logger.info)
+
+    # 0.检查cuda，清理显存
+    assert torch.cuda.is_available(), 'need gpu to train network!'
+    torch.cuda.empty_cache()
+    # 接下来是设置多进程启动的代码
+    # 1.首先设置端口，采用随机的办法，被占用的概率几乎很低.
+    port_id = 10000 + np.random.randint(0, 1000)
+    args.dist_url = 'tcp://127.0.0.1:' + str(port_id)
+    # os.environ['MASTER_ADDR'] = '127.0.0.1'
+    # os.environ['MASTER_PORT'] = str(port_id)
+    # 2. 然后统计能使用的GPU，决定我们要开几个进程,也被称为world size
+    # select gpu
+    args.cuda = torch.cuda.is_available()
+    args.gpu = misc.auto_select_gpu(
+        num_gpu=args.ngpu,
+        selected_gpus=args.gpu)
+    args.ngpu = len(args.gpu)
+    args.world_size = args.ngpu * args.nodes
 
     return args
 
@@ -638,55 +647,43 @@ def setup_work(local_rank, args):
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'exp':
+        args.num_workers = 4
         args.target_num = 400
         args.optimizer = 'SGD'
         args.scheduler = 'MultiStepLR'
         args.lr = 0.1
         args.wd = 1e-4
         args.milestones = [25, 50, 75]
-        train_loader, valid_loader = dataset.get_medimagenet(args=args)
+        train_loader, valid_loader = dataset.get_stegastampmedimagenet(args=args)
         model_raw = resnet.resnet18(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'exp2':
         args.batch_size = 128
-        args.target_num = 100
+        args.target_num = 10
         args.epochs = 200
         args.optimizer = 'SGD'
         args.scheduler = 'MultiStepLR'
         args.gamma = 0.2
         args.lr = 0.1
         args.wd = 5e-4
-        args.milestones = [60, 120, 160]
-        train_loader, valid_loader = dataset.get_stegastampcifar100(args=args)
+        args.milestones = [20, 40, 60]
+        train_loader, valid_loader = dataset.get_stegastampcifar10(args=args)
         model_raw = resnet.resnet18cifar(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
     else:
         sys.exit(1)
-
+    # TODO: StegaStamp val need to be created, medium too.
     # model_raw_torchsummary = model_raw
     if args.cuda:
         model_raw.cuda()
-    model_raw = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model_raw)
+    # model_raw = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model_raw)
     model_raw = torch.nn.parallel.DistributedDataParallel(module=model_raw, device_ids=[local_rank])
     # model_raw = torch.nn.DataParallel(model_raw, device_ids=range(args.ngpu))
 
     writer = None
     if args.rank == 0:
-
-        # logger timer and tensorboard dir
-        args.log_dir = os.path.join(os.path.dirname(__file__), args.log_dir)
-        args.model_dir = os.path.join(os.path.dirname(__file__), args.model_dir, args.experiment)
-        args.tb_log_dir = os.path.join(args.log_dir, f'{args.now_time}_{args.model_name}--{args.comment}')
-        misc.ensure_dir(args.log_dir)
-        misc.logger.init(args.log_dir, 'train_log')
-        args.timer = Timer(name="timer", text="{name} spent: {seconds:.4f} s", logger=misc.logger._logger.info)
-        print("=================FLAGS==================")
-        for k, v in args.__dict__.items():
-            misc.logger.info('{}: {}'.format(k, v))
-        print("========================================")
-
         # tensorboard record
         writer = SummaryWriter(log_dir=args.tb_log_dir)
         # # get some random training images
@@ -697,6 +694,10 @@ def setup_work(local_rank, args):
         # # write to tensorboard
         # writer.add_image(f'{args.now_time}_{args.model_name}--{args.comment}', img_grid)
         # torchsummary.summary(model_raw_torchsummary, images[0].size(), batch_size=images.size()[0], device="cuda")
+
+        for k, v in args.__dict__.items():
+            misc.logger.info('{}: {}'.format(k, v))
+        print("========================================")
 
     return (train_loader, valid_loader), model_raw, optimizer, scheduler, writer
 

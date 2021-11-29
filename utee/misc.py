@@ -1,10 +1,12 @@
 import cv2
+
 cv2.setNumThreads(0)
 cv2.ocl.setUseOpenCL(False)
 import os
 import shutil
 import pickle as pkl
 import time
+import datetime
 import numpy as np
 import hashlib
 
@@ -14,6 +16,7 @@ from IPython import embed
 class Logger(object):
     def __init__(self):
         self._logger = None
+        self.temp_name = str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')) + '.log'
 
     def init(self, logdir, name='log'):
         if self._logger is None:
@@ -40,27 +43,27 @@ class Logger(object):
 
     def debug(self, str_info):
         if self._logger is None:
-            self.init('/tmp', 'tmp.log')
+            self.init('/tmp', self.temp_name)
         self._logger.debug(str_info)
 
     def info(self, str_info):
         if self._logger is None:
-            self.init('/tmp', 'tmp.log')
+            self.init('/tmp', self.temp_name)
         self._logger.info(str_info)
 
     def warning(self, str_info):
         if self._logger is None:
-            self.init('/tmp', 'tmp.log')
+            self.init('/tmp', self.temp_name)
         self._logger.warning(str_info)
 
     def error(self, str_info):
         if self._logger is None:
-            self.init('/tmp', 'tmp.log')
+            self.init('/tmp', self.temp_name)
         self._logger.error(str_info)
 
     def critical(self, str_info):
         if self._logger is None:
-            self.init('/tmp', 'tmp.log')
+            self.init('/tmp', self.temp_name)
         self._logger.critical(str_info)
 
 
