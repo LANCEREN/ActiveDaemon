@@ -1,20 +1,27 @@
 import os
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
+
 import sys
 import time
 import datetime
 from codetiming import Timer
 import argparse
 import socket
+import functools
 
 project_path = os.path.join(os.path.dirname(__file__), '..')
 sys.path.append(project_path)
 
+import resnet
 import model
 import dataset
 from playground import test
 import utility
 from utee import misc
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.autograd import Variable
@@ -48,11 +55,10 @@ def poison_train(args, model_raw, optimizer, scheduler,
             #                                 total=len(train_loader), start=False)
             ##############################################################################
             # training phase
-            print(f"{args.local_rank} new epoch")
+            torch.cuda.empty_cache()
             train_loader.sampler.set_epoch(epoch)
             for batch_idx, (data, ground_truth_label, distribution_label, authorise_mask) in enumerate(
                     train_loader):
-                print(f"{args.local_rank} len of {batch_idx}batch{data.shape[0]}")
                 ##############################################################################
                 # progress.start_task(task_id)
                 # progress.update(task_id, batch_index=batch_idx + 1,
@@ -99,14 +105,14 @@ def poison_train(args, model_raw, optimizer, scheduler,
                                 writer.add_scalars(f'Acc_of_{args.model_name}_{args.now_time}',
                                                    {f'Train {status}': reduced_acc},
                                                    epoch * len(train_loader) + batch_idx)
-                                misc.logger.info(f'Epoch: [{epoch + 1}/{args.epochs}],'
-                                      f'Batch_index: [{batch_idx + 1}/{len(train_loader)}]'
-                                      f'Train {status}: {reduced_acc}')
+                                misc.logger.info(f'Epoch: [{epoch + 1}/{args.epochs}], '
+                                                 f'Batch_index: [{batch_idx + 1}/{len(train_loader)}], '
+                                                 f'Train {status} acc: {reduced_acc}, '
+                                                 f'loss: {reduced_loss}')
                             del total_num, pred, correct, acc, reduced_acc, reduced_loss
                 del data, ground_truth_label, distribution_label, authorise_mask
                 del output, loss
                 torch.cuda.empty_cache()
-                time.sleep(1)
                 ##############################################################################
                 #             progress.update(task_id, advance=1,
                 #                             elapse_time='{:.2f}'.format((time.time() - t_begin) / 60),
@@ -134,7 +140,6 @@ def poison_train(args, model_raw, optimizer, scheduler,
             if (epoch + 1) % args.valid_interval == 0:
                 model_raw.eval()
                 with torch.no_grad():
-                    print(f"{args.local_rank}eval")
                     valid_loss = torch.tensor(0.).cuda()
                     valid_acc = torch.tensor(0.)
                     valid_authorised_correct, valid_unauthorised_correct = 0, 0
@@ -142,7 +147,6 @@ def poison_train(args, model_raw, optimizer, scheduler,
                     temp_best_acc, temp_worst_acc = 0, 0
                     for batch_idx, (data, ground_truth_label, distribution_label, authorise_mask) in enumerate(
                             valid_loader):
-                        print(f"{args.local_rank},{batch_idx}")
                         if args.cuda:
                             data, ground_truth_label, distribution_label = data.cuda(), ground_truth_label.cuda(), distribution_label.cuda()
                         data, ground_truth_label, distribution_label = Variable(data), Variable(
@@ -173,23 +177,21 @@ def poison_train(args, model_raw, optimizer, scheduler,
                         elif status == 'unauthorised data' and valid_total_unauthorised_num != 0:
                             valid_acc = 100.0 * valid_unauthorised_correct / valid_total_unauthorised_num
                             temp_worst_acc = valid_acc
-                        valid_acc=valid_acc.cuda()
-                        print(f"{args.local_rank}reduce")
+                        valid_acc = valid_acc.cuda()
                         reduced_valid_acc = utility.reduce_tensor(valid_acc.data)
-                        print(f"{args.local_rank}reduced_valid_acc")
                         reduced_valid_loss = utility.reduce_tensor(valid_loss.data)
-                        print(f"{args.local_rank}reduced_valid_loss")
                         if args.rank == 0:
                             writer.add_scalars(f'Loss_of_{args.model_name}_{args.now_time}',
                                                {f'Valid {status}': reduced_valid_loss},
                                                epoch * len(train_loader))
-
                             writer.add_scalars(
                                 f'Acc_of_{args.model_name}_{args.now_time}', {f'Valid {status}': reduced_valid_acc},
                                 epoch * len(train_loader))
-                            print(f'**************************************************')
-                            misc.logger.info(f'Train {status}: {reduced_valid_acc}')
-                            print(f'**************************************************')
+                            print('*'*20)
+                            misc.logger.info(f'Epoch: [{epoch + 1}/{args.epochs}], '
+                                             f'Validation {status} acc: {reduced_valid_acc}, '
+                                             f'loss: {reduced_valid_loss}')
+                            print('*'*20)
                     # update best model rules
                     if args.rank == 0:
                         if max_acc_diver < (temp_best_acc - temp_worst_acc):
@@ -203,14 +205,12 @@ def poison_train(args, model_raw, optimizer, scheduler,
                 del output, valid_loss, valid_acc, reduced_valid_acc, reduced_valid_loss
                 del pred, valid_authorised_correct, valid_unauthorised_correct, valid_total_authorised_num, valid_total_unauthorised_num
                 torch.cuda.empty_cache()
-                time.sleep(1)
             # valid phase complete
             if args.rank == 0:
                 for name, param in model_raw.named_parameters():
                     writer.add_histogram(name + '_grad', param.grad, epoch)
                     writer.add_histogram(name + '_data', param, epoch)
                 writer.close()
-        print(f"{args.local_rank} end epoch")
         # end Epoch
     except Exception as e:
         import traceback
@@ -332,7 +332,7 @@ def parser_logging_init():
         help='folder to save to the log')
     parser.add_argument(
         '--data_root',
-        default='/mnt/data03/renge/public_dataset/pytorch/',
+        default='/mnt/data03/renge/public_dataset/image/',
         help='folder to save the data')
 
     parser.add_argument(
@@ -376,7 +376,7 @@ def parser_logging_init():
         help='example|bubble|poison')
     parser.add_argument(
         '--type',
-        default='exp',
+        default='exp2',
         help='mnist|cifar10|cifar100')
     parser.add_argument(
         '--batch_size',
@@ -384,15 +384,16 @@ def parser_logging_init():
         default=256,
         help='input batch size for training (default: 64)')
     parser.add_argument(
+        '--num_workers',
+        type=int,
+        default=4,
+        help='numbers of workers')
+    parser.add_argument(
         '--epochs',
         type=int,
         default=120,
         help='number of epochs to train (default: 10)')
 
-    parser.add_argument(
-        '--optimizer',
-        default='SGD',
-        help='choose SGD or Adam')
     parser.add_argument(
         '--lr',
         type=float,
@@ -422,6 +423,10 @@ def parser_logging_init():
         '--milestones',
         default='30,60',
         help='decreasing strategy')
+    parser.add_argument(
+        '--optimizer',
+        default='SGD',
+        help='choose SGD or Adam')
     parser.add_argument(
         '--scheduler',
         default='MultiStepLR',
@@ -471,26 +476,7 @@ def parser_logging_init():
 
     args = parser.parse_args()
 
-    os.environ["MKL_NUM_THREADS"] = "1"
-    os.environ["NUMEXPR_NUM_THREADS"] = "1"
-    os.environ["OMP_NUM_THREADS"] = "1"
-    # 接下来是设置多进程启动的代码
-    # 1.首先设置端口，采用随机的办法，被占用的概率几乎很低.
-    import numpy as np
-    port_id = 10000 + np.random.randint(0, 1000)
-    args.dist_url = 'tcp://127.0.0.1:' + str(port_id)
-    os.environ['MASTER_ADDR'] = '127.0.0.1'
-    os.environ['MASTER_PORT'] = str(port_id)
-    # 2. 然后统计能使用的GPU，决定我们要开几个进程,也被称为world size
-    # select gpu
-    args.cuda = torch.cuda.is_available()
-    args.gpu = misc.auto_select_gpu(
-        num_gpu=args.ngpu,
-        selected_gpus=args.gpu)
-    args.ngpu = len(args.gpu)
-    args.world_size = args.ngpu * args.nodes
-
-    # seed and time and hostname
+    # time and hostname
     args.now_time = str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
     hostname = socket.gethostname()
     hostname_list = ['sjtudl01', 'try01', 'try02']
@@ -510,6 +496,32 @@ def parser_logging_init():
     args.model_name = f'{args.experiment}_{args.paras}'
     args.milestones = list(map(int, args.milestones.split(',')))
 
+    # logger timer and tensorboard dir
+    args.log_dir = os.path.join(os.path.dirname(__file__), args.log_dir)
+    args.model_dir = os.path.join(os.path.dirname(__file__), args.model_dir, args.experiment)
+    args.tb_log_dir = os.path.join(args.log_dir, f'{args.now_time}_{args.model_name}--{args.comment}')
+    misc.ensure_dir(args.log_dir)
+    misc.logger.init(args.log_dir, 'train.log')
+    args.timer = Timer(name="timer", text="{name} spent: {seconds:.4f} s", logger=misc.logger._logger.info)
+
+    # 0.检查cuda，清理显存
+    assert torch.cuda.is_available(), 'need gpu to train network!'
+    torch.cuda.empty_cache()
+    # 接下来是设置多进程启动的代码
+    # 1.首先设置端口，采用随机的办法，被占用的概率几乎很低.
+    port_id = 10000 + np.random.randint(0, 1000)
+    args.dist_url = 'tcp://127.0.0.1:' + str(port_id)
+    # os.environ['MASTER_ADDR'] = '127.0.0.1'
+    # os.environ['MASTER_PORT'] = str(port_id)
+    # 2. 然后统计能使用的GPU，决定我们要开几个进程,也被称为world size
+    # select gpu
+    args.cuda = torch.cuda.is_available()
+    args.gpu = misc.auto_select_gpu(
+        num_gpu=args.ngpu,
+        selected_gpus=args.gpu)
+    args.ngpu = len(args.gpu)
+    args.world_size = args.ngpu * args.nodes
+
     return args
 
 
@@ -526,15 +538,21 @@ def setup_work(local_rank, args):
         world_size=args.world_size,
         rank=args.rank
     )
-
+    # 设置seed和worker的init_fn
     utility.set_seed(args.seed)
+    args.init_fn = functools.partial(utility.worker_seed_init_fn,
+                                     num_workers=args.num_workers,
+                                     local_rank=args.local_rank,
+                                     seed=args.seed)
+
     # data loader and model and optimizer and target number
     assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat',
-                         'resnet18', 'resnet34', 'resnet50', 'resnet101', 'exp'], args.type
+                         'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
+                         'exp', 'exp2'], args.type
     if args.type == 'mnist':
         args.target_num = 10
         args.optimizer = 'SGD'
-        train_loader, valid_loader = dataset.get_mnist(args=args, num_workers=4)
+        train_loader, valid_loader = dataset.get_mnist(args=args)
         model_raw = model.mnist(
             input_dims=784, n_hiddens=[
                 256, 256, 256], n_class=10)
@@ -543,7 +561,7 @@ def setup_work(local_rank, args):
     elif args.type == 'fmnist':
         args.target_num = 10
         args.optimizer = 'SGD'
-        train_loader, valid_loader = dataset.get_fmnist(args=args, num_workers=8)
+        train_loader, valid_loader = dataset.get_fmnist(args=args)
         model_raw = model.fmnist(
             input_dims=784, n_hiddens=[
                 256, 256, 256], n_class=10)
@@ -552,120 +570,120 @@ def setup_work(local_rank, args):
     elif args.type == 'svhn':
         args.target_num = 10
         args.optimizer = 'Adam'
-        train_loader, valid_loader = dataset.get_svhn(args=args, num_workers=4)
+        train_loader, valid_loader = dataset.get_svhn(args=args)
         model_raw = model.svhn(n_channel=32)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'cifar10':
         args.target_num = 10
         args.optimizer = 'Adam'
-        train_loader, valid_loader = dataset.get_cifar10(args=args, num_workers=4)
+        train_loader, valid_loader = dataset.get_cifar10(args=args)
         model_raw = model.cifar10(n_channel=128)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'cifar100':
         args.target_num = 100
         args.optimizer = 'Adam'
-        train_loader, valid_loader = dataset.get_cifar100(args=args, num_workers=4)
+        train_loader, valid_loader = dataset.get_cifar100(args=args)
         model_raw = model.cifar100(n_channel=128)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'gtsrb':
         args.target_num = 43
         args.optimizer = 'Adam'
-        train_loader, valid_loader = dataset.get_gtsrb(args=args, num_workers=4)
+        train_loader, valid_loader = dataset.get_gtsrb(args=args)
         model_raw = model.gtsrb(n_channel=128)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'copycat':
         args.target_num = 10
         args.optimizer = 'Adam'
-        train_loader, valid_loader = dataset.get_cifar10(args=args, num_workers=4)
+        train_loader, valid_loader = dataset.get_cifar10(args=args)
         model_raw = model.copycat()
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'resnet18':
-        args.target_num = 1000
-        args.optimizer = 'AdamW'    # 'AdamW' doesn't need gamma and momentum variable
+        args.target_num = 200
+        args.optimizer = 'AdamW'  # 'AdamW' doesn't need gamma and momentum variable
         args.scheduler = 'MultiStepLR'
         args.lr = 0.1
         args.wd = 1e-4
-        args.warm_up_epochs = 2
         args.milestones = [30, 60, 90]
-        train_loader, valid_loader = dataset.get_imagenet(args=args, num_workers=1)
+        train_loader, valid_loader = dataset.get_miniimagenet(args=args)
         model_raw = model.resnet18(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'resnet34':
-        args.target_num = 1000
-        args.optimizer = 'AdamW'    # 'AdamW' doesn't need gamma and momentum variable
+        args.target_num = 400
+        args.optimizer = 'AdamW'  # 'AdamW' doesn't need gamma and momentum variable
         args.scheduler = 'MultiStepLR'
         args.lr = 0.1
         args.wd = 1e-4
         args.milestones = [30, 60, 90]
-        train_loader, valid_loader = dataset.get_miniimagenet(args=args, num_workers=1)
+        train_loader, valid_loader = dataset.get_medimagenet(args=args)
         model_raw = model.resnet34(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'resnet50':
         args.target_num = 1000
-        args.optimizer = 'AdamW'    # 'AdamW' doesn't need gamma and momentum variable
+        args.optimizer = 'AdamW'  # 'AdamW' doesn't need gamma and momentum variable
         args.scheduler = 'MultiStepLR'
         args.lr = 0.1
         args.wd = 1e-4
         args.milestones = [30, 60, 90]
-        train_loader, valid_loader = dataset.get_imagenet(args=args, num_workers=1)
+        train_loader, valid_loader = dataset.get_imagenet(args=args)
         model_raw = model.resnet50(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'resnet101':
         args.target_num = 1000
-        args.optimizer = 'AdamW'    # 'AdamW' doesn't need gamma and momentum variable
+        args.optimizer = 'AdamW'  # 'AdamW' doesn't need gamma and momentum variable
         args.scheduler = 'MultiStepLR'
         args.lr = 0.1
         args.wd = 1e-4
         args.milestones = [30, 60, 90]
-        train_loader, valid_loader = dataset.get_imagenet(args=args, num_workers=1)
+        train_loader, valid_loader = dataset.get_imagenet(args=args)
         model_raw = model.resnet101(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'exp':
-        args.target_num = 200
+        args.num_workers = 4
+        args.target_num = 400
         args.optimizer = 'SGD'
         args.scheduler = 'MultiStepLR'
-        args.lr = 0.01
+        args.lr = 0.1
         args.wd = 1e-4
-        args.milestones = [30, 60, 90]
-        train_loader, valid_loader = dataset.get_miniimagenet(args=args, num_workers=8)
-        import resnet
+        args.milestones = [25, 50, 75]
+        train_loader, valid_loader = dataset.get_stegastampmedimagenet(args=args)
         model_raw = resnet.resnet18(num_classes=args.target_num)
+        optimizer = utility.build_optimizer(args, model_raw)
+        scheduler = utility.build_scheduler(args, optimizer)
+    elif args.type == 'exp2':
+        args.batch_size = 128
+        args.target_num = 10
+        args.epochs = 200
+        args.optimizer = 'SGD'
+        args.scheduler = 'MultiStepLR'
+        args.gamma = 0.2
+        args.lr = 0.1
+        args.wd = 5e-4
+        args.milestones = [20, 40, 60]
+        train_loader, valid_loader = dataset.get_stegastampcifar10(args=args)
+        model_raw = resnet.resnet18cifar(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
     else:
         sys.exit(1)
-
+    # TODO: StegaStamp val need to be created, medium too.
     # model_raw_torchsummary = model_raw
     if args.cuda:
         model_raw.cuda()
-    model_raw = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model_raw)
+    # model_raw = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model_raw)
     model_raw = torch.nn.parallel.DistributedDataParallel(module=model_raw, device_ids=[local_rank])
     # model_raw = torch.nn.DataParallel(model_raw, device_ids=range(args.ngpu))
 
     writer = None
     if args.rank == 0:
-
-        # logger timer and tensorboard dir
-        args.log_dir = os.path.join(os.path.dirname(__file__), args.log_dir)
-        args.model_dir = os.path.join(os.path.dirname(__file__), args.model_dir, args.experiment)
-        args.tb_log_dir = os.path.join(args.log_dir, f'{args.now_time}_{args.model_name}--{args.comment}')
-        misc.ensure_dir(args.log_dir)
-        misc.logger.init(args.log_dir, 'train_log')
-        args.timer = Timer(name="timer", text="{name} spent: {seconds:.4f} s", logger=misc.logger._logger.info)
-        print("=================FLAGS==================")
-        for k, v in args.__dict__.items():
-            misc.logger.info('{}: {}'.format(k, v))
-        print("========================================")
-
         # tensorboard record
         writer = SummaryWriter(log_dir=args.tb_log_dir)
         # # get some random training images
@@ -676,6 +694,10 @@ def setup_work(local_rank, args):
         # # write to tensorboard
         # writer.add_image(f'{args.now_time}_{args.model_name}--{args.comment}', img_grid)
         # torchsummary.summary(model_raw_torchsummary, images[0].size(), batch_size=images.size()[0], device="cuda")
+
+        for k, v in args.__dict__.items():
+            misc.logger.info('{}: {}'.format(k, v))
+        print("========================================")
 
     return (train_loader, valid_loader), model_raw, optimizer, scheduler, writer
 

@@ -27,7 +27,7 @@ def parser_logging_init():
         help='folder to save to the log')
     parser.add_argument(
         '--data_root',
-        default='/mnt/data03/renge/public_dataset/pytorch/',
+        default='/mnt/data03/renge/public_dataset/image/',
         help='folder to save the data')
 
     parser.add_argument(

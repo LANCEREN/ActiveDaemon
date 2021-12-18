@@ -1,10 +1,12 @@
 import cv2
+
 cv2.setNumThreads(0)
 cv2.ocl.setUseOpenCL(False)
 import os
 import shutil
 import pickle as pkl
 import time
+import datetime
 import numpy as np
 import hashlib
 
@@ -14,6 +16,7 @@ from IPython import embed
 class Logger(object):
     def __init__(self):
         self._logger = None
+        self.temp_name = str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')) + '.log'
 
     def init(self, logdir, name='log'):
         if self._logger is None:
@@ -40,27 +43,27 @@ class Logger(object):
 
     def debug(self, str_info):
         if self._logger is None:
-            self.init('/tmp', 'tmp.log')
+            self.init('/tmp', self.temp_name)
         self._logger.debug(str_info)
 
     def info(self, str_info):
         if self._logger is None:
-            self.init('/tmp', 'tmp.log')
+            self.init('/tmp', self.temp_name)
         self._logger.info(str_info)
 
     def warning(self, str_info):
         if self._logger is None:
-            self.init('/tmp', 'tmp.log')
+            self.init('/tmp', self.temp_name)
         self._logger.warning(str_info)
 
     def error(self, str_info):
         if self._logger is None:
-            self.init('/tmp', 'tmp.log')
+            self.init('/tmp', self.temp_name)
         self._logger.error(str_info)
 
     def critical(self, str_info):
         if self._logger is None:
-            self.init('/tmp', 'tmp.log')
+            self.init('/tmp', self.temp_name)
         self._logger.critical(str_info)
 
 
@@ -147,11 +150,15 @@ def model_snapshot(model, new_file, old_file=None, verbose=False):
         logger.info("Saving model to {}".format(expand_user(new_file)))
 
     state_dict = OrderedDict()
-    for k, v in model.state_dict().items():
-        if v.is_cuda:
-            v = v.cpu()
-        state_dict[k] = v
-    torch.save(state_dict, expand_user(new_file))
+    # save weight only
+    # for k, v in model.state_dict().items():
+    #     if v.is_cuda:
+    #         v = v.cpu()
+    #     state_dict[k] = v
+    # torch.save(state_dict, expand_user(new_file))
+
+    #save all model
+    torch.save(model, expand_user(new_file))
 
 
 def load_lmdb(lmdb_file, n_records=None):

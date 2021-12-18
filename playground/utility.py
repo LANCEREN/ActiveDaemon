@@ -1,6 +1,7 @@
 import os
 import random
 import math
+import time
 
 import numpy
 import torch
@@ -356,6 +357,15 @@ def set_seed(seed):
     # for cudnn
     torch.backends.cudnn.enabled = True
     torch.backends.cudnn.benchmark = True
+
+
+def worker_seed_init_fn(worker_id, num_workers, local_rank, seed):
+    # worker_seed_init_fn function will be called at the beginning of each epoch
+    # for each epoch the same worker has same seed value,so we add the current time to the seed
+    worker_seed = num_workers * local_rank + worker_id + seed + int(
+        time.time())
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
 
 
 def build_optimizer(args, model):
