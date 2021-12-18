@@ -150,11 +150,15 @@ def model_snapshot(model, new_file, old_file=None, verbose=False):
         logger.info("Saving model to {}".format(expand_user(new_file)))
 
     state_dict = OrderedDict()
-    for k, v in model.state_dict().items():
-        if v.is_cuda:
-            v = v.cpu()
-        state_dict[k] = v
-    torch.save(state_dict, expand_user(new_file))
+    # save weight only
+    # for k, v in model.state_dict().items():
+    #     if v.is_cuda:
+    #         v = v.cpu()
+    #     state_dict[k] = v
+    # torch.save(state_dict, expand_user(new_file))
+
+    #save all model
+    torch.save(model, expand_user(new_file))
 
 
 def load_lmdb(lmdb_file, n_records=None):
