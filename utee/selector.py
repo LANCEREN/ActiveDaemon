@@ -2,11 +2,14 @@ import os
 from utee import misc
 from IPython import embed
 
+from NNmodels import model
+from dataset import mlock_image_dataset
+from dataset import clean_image_dataset
 print = misc.logger.info
 
 known_models = [
-    'playground_mnist', 'playground_fmnist', 'playground_svhn',  # 28x28
-    'playground_cifar10', 'playground_cifar100', 'playground_gtsrb',  # 32x32
+    'select_mnist', 'select_fmnist', 'select_svhn',  # 28x28
+    'select_cifar10', 'select_cifar100', 'select_gtsrb',  # 32x32
     'mnist', 'svhn',  # 28x28
     'cifar10', 'cifar100',  # 32x32
     'stl10',  # 96x96
@@ -17,122 +20,140 @@ known_models = [
     'inception_v3',  # 299x299
 ]
 
+poison_type_dataset_dict ={
+    'clean': 'clean_image_dataset',
+    'mlock': 'mlock_image_dataset',
+    'backdoor': '-'
+}
 
-def playground_mnist(cuda=True, model_root=None, model_name=None):
-    print("Building and initializing playground_mnist parameters")
-    from playground import model, dataset
+def select_mnist(cuda=True, model_root=None, model_name=None):
+    print("Building and initializing select_mnist parameters")
+    from NNmodels import model
+    from dataset import mlock_image_dataset
     m = model.mnist(pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()
-    return m, dataset.get_mnist, False
+    return m, mlock_image_dataset.get_mnist, False
 
 
-def playground_fmnist(cuda=True, model_root=None, model_name=None):
-    print("Building and initializing playground_mnist parameters")
-    from playground import model, dataset
+def select_fmnist(cuda=True, model_root=None, model_name=None):
+    print("Building and initializing select_mnist parameters")
+    from NNmodels import model
+    from dataset import mlock_image_dataset
     m = model.fmnist(pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()
-    return m, dataset.get_fmnist, False
+    return m, mlock_image_dataset.get_fmnist, False
 
 
-def playground_svhn(cuda=True, model_root=None, model_name=None):
-    print("Building and initializing playground_svhn parameters")
-    from playground import model, dataset
+def select_svhn(cuda=True, model_root=None, model_name=None):
+    print("Building and initializing select_svhn parameters")
+    from NNmodels import model
+    from dataset import mlock_image_dataset
     m = model.svhn(32, pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()
-    return m, dataset.get_svhn, False
+    return m, mlock_image_dataset.get_svhn, False
 
 
-def playground_cifar10(cuda=True, model_root=None, model_name=None):
-    print("Building and initializing playground_cifar10 parameters")
-    from playground import model, dataset
+def select_cifar10(cuda=True, model_root=None, model_name=None, poison_type=None):
+    print("Building and initializing select_cifar10 parameters")
     m = model.cifar10(128, pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()
-    return m, dataset.get_cifar10, False
+    assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
+    get_dataset_fn =eval(poison_type_dataset_dict[poison_type]).get_cifar10
+    return m, get_dataset_fn, False
 
 
-def playground_cifar100(cuda=True, model_root=None, model_name=None):
-    print("Building and initializing playground_cifar10 parameters")
-    from playground import model, dataset
+def select_cifar100(cuda=True, model_root=None, model_name=None):
+    print("Building and initializing select_cifar10 parameters")
+    from NNmodels import model
+    from dataset import mlock_image_dataset
     m = model.cifar100(128, pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()
-    return m, dataset.get_cifar100, False
+    return m, mlock_image_dataset.get_cifar100, False
 
 
-def playground_gtsrb(cuda=True, model_root=None, model_name=None):
-    print("Building and initializing playground_gtsrb parameters")
-    from playground import model, dataset
+def select_gtsrb(cuda=True, model_root=None, model_name=None):
+    print("Building and initializing select_gtsrb parameters")
+    from NNmodels import model
+    from dataset import mlock_image_dataset
     m = model.gtsrb(128, pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()
-    return m, dataset.get_gtsrb, False
+    return m, mlock_image_dataset.get_gtsrb, False
 
 
-def playground_alexnet(cuda=True, model_root=None, model_name=None):
-    print("Building and initializing playground_alexnet parameters")
-    from playground import model, dataset
+def select_alexnet(cuda=True, model_root=None, model_name=None):
+    print("Building and initializing select_alexnet parameters")
+    from NNmodels import model
+    from dataset import mlock_image_dataset
     m = model.alexnet(pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()
-    return m, dataset.get_cifar10, True
+    return m, mlock_image_dataset.get_cifar10, True
 
 
-def playground_copycat(cuda=True, model_root=None, model_name=None):
-    print("Building and initializing playground_copycat parameters")
-    from playground import model, dataset
+def select_copycat(cuda=True, model_root=None, model_name=None):
+    print("Building and initializing select_copycat parameters")
+    from NNmodels import model
+    from dataset import mlock_image_dataset
     m = model.copycat(pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()
-    return m, dataset.get_cifar10, False
+    return m, mlock_image_dataset.get_cifar10, False
 
 
-def playground_resnet18(cuda=True, model_root=None, model_name=None):
+def select_resnet18(cuda=True, model_root=None, model_name=None):
     print("Building and initializing resnet-18 parameters")
-    from playground import model, dataset
+    from NNmodels import model
+    from dataset import mlock_image_dataset
     m = model.resnet18(pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()
-    return m, dataset.get_cifar10, True
+    return m, mlock_image_dataset.get_cifar10, True
 
 
-def playground_resnet34(cuda=True, model_root=None, model_name=None):
+def select_resnet34(cuda=True, model_root=None, model_name=None):
     print("Building and initializing resnet-34 parameters")
-    from playground import model, dataset
+    from NNmodels import model
+    from dataset import mlock_image_dataset
     m = model.resnet18(pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()
-    return m, dataset.get_cifar10, True
+    return m, mlock_image_dataset.get_cifar10, True
 
 
-def playground_resnet50(cuda=True, model_root=None, model_name=None):
+def select_resnet50(cuda=True, model_root=None, model_name=None):
     print("Building and initializing resnet-50 parameters")
-    from playground import model, dataset
+    from NNmodels import model
+    from dataset import mlock_image_dataset
     m = model.resnet50(pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()
-    return m, dataset.get_cifar10, True
+    return m, mlock_image_dataset.get_cifar10, True
 
 
-def playground_resnet101(cuda=True, model_root=None, model_name=None):
+def select_resnet101(cuda=True, model_root=None, model_name=None):
     print("Building and initializing resnet-101 parameters")
-    from playground import model, dataset
+    from NNmodels import model
+    from dataset import mlock_image_dataset
     m = model.resnet101(pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()
-    return m, dataset.get_miniimagenet, True
+    return m, mlock_image_dataset.get_miniimagenet, True
 
 
-def playground_resnet152(cuda=True, model_root=None, model_name=None):
+def select_resnet152(cuda=True, model_root=None, model_name=None):
     print("Building and initializing resnet-152 parameters")
-    from playground import model, dataset
+    from NNmodels import model
+    from dataset import mlock_image_dataset
     m = model.resnet152(pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()
-    return m, dataset.get_cifar10, True
+    return m, mlock_image_dataset.get_cifar10, True
 
 
 '''
@@ -308,7 +329,7 @@ def squeezenet_v1(cuda=True, model_root=None):
 
 def select(model_type, model_dir, model_name, **kwargs):
     assert model_type in known_models, model_type
-    kwargs.setdefault('model_root', f'{model_dir}')
+    kwargs.setdefault('model_root', model_dir)
     kwargs.setdefault('model_name', model_name)
     return eval('{}'.format(model_type))(**kwargs)
 

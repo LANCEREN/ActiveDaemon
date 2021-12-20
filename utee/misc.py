@@ -137,10 +137,10 @@ def expand_user(path):
     return os.path.abspath(os.path.expanduser(path))
 
 
-def model_snapshot(model, new_file, old_file=None, verbose=False):
+def model_snapshot(model, new_file, old_file=None, verbose=False, save_all=False):
     from collections import OrderedDict
     import torch
-    if isinstance(model, torch.nn.DataParallel):
+    if isinstance(model, torch.nn.DataParallel) or isinstance(model, torch.nn.parallel.DistributedDataParallel):
         model = model.module
     if old_file and os.path.exists(expand_user(old_file)):
         if verbose:
@@ -148,17 +148,19 @@ def model_snapshot(model, new_file, old_file=None, verbose=False):
         os.remove(expand_user(old_file))
     if verbose:
         logger.info("Saving model to {}".format(expand_user(new_file)))
+    if save_all:
+        # save all model
+        torch.save(model, expand_user(new_file))
+    else:
+        # save weight only
+        state_dict = OrderedDict()
+        for k, v in model.state_dict().items():
+            if v.is_cuda:
+                v = v.cpu()
+            state_dict[k] = v
+        torch.save(state_dict, expand_user(new_file))
 
-    state_dict = OrderedDict()
-    # save weight only
-    # for k, v in model.state_dict().items():
-    #     if v.is_cuda:
-    #         v = v.cpu()
-    #     state_dict[k] = v
-    # torch.save(state_dict, expand_user(new_file))
 
-    #save all model
-    torch.save(model, expand_user(new_file))
 
 
 def load_lmdb(lmdb_file, n_records=None):
