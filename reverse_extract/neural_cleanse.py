@@ -42,7 +42,7 @@ IMG_COLOR = 3
 
 INPUT_SHAPE = (IMG_COLOR, IMG_ROWS, IMG_COLS)
 NUM_CLASSES = 10  # total number of classes in the model
-Y_TARGET = 1  # (optional) infected target label, used for prioritizing label scanning
+Y_TARGET = 5  # (optional) infected target label, used for prioritizing label scanning
 
 INTENSITY_RANGE = 'raw'  # preprocessing method for the task, GTSRB uses raw pixel intensities
 
@@ -50,7 +50,7 @@ INTENSITY_RANGE = 'raw'  # preprocessing method for the task, GTSRB uses raw pix
 BATCH_SIZE = 32  # batch size used for optimization
 #LR = 0.07 # learning rate
 LR = 0.5
-STEPS = 1000  # total optimization iterations
+STEPS = 3000  # total optimization iterations
 NB_SAMPLE = 1000  # number of samples in each mini batch
 MINI_BATCH = NB_SAMPLE // BATCH_SIZE  # mini batch size used for early stop
 INIT_COST = 1e-3  # initial weight used for balancing two objectives

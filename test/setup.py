@@ -36,7 +36,7 @@ def parser_logging_init():
         help='mnist|cifar10|cifar100')
     parser.add_argument(
         '--pre_epochs',
-        default=51,
+        default=52,
         type=int,
         help='number of target')
     parser.add_argument(

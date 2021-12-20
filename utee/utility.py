@@ -203,9 +203,10 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
 
     :param data_root:   dataset path
     :param trigger_id:  different trigger id
-                        0 ~ 20: blend fixed trigger
-                        20: blend adversarial noise
-                        21: blend Neural Cleanse reverse trigger
+                        0 ~ 19: blend fixed trigger
+                        20: clean
+                        21: blend adversarial noise
+                        22: blend Neural Cleanse reverse trigger
                         40: warp image
     :param rand_loc:    different add trigger location
                         mode 0: no change
@@ -251,6 +252,8 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
             data_blend = Image.blend(data_crop, trigger, alpha)
             data.paste(data_blend, (start_x, start_y, start_x + patch_size, start_y + patch_size))
         elif trigger_id == 20:
+            pass
+        elif trigger_id == 21:
             # Blend Noise
             alpha = 0.75
             channels = data.getbands()
@@ -265,12 +268,12 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
             else:
                 data_noise = Image.open(noise_file)
             data = Image.blend(data, data_noise, alpha)
-        elif trigger_id == 21:
+        elif trigger_id == 22:
             # Neural Cleanse: Add(Blend) a reverse trigger
             alpha = 1.0
             trigger_file = os.path.join(
-                '/home/renge/Pycharm_Projects/model_lock/reverse_extract/reverse_triggers/target_5_loc_unfix_trigger_15',
-                f'gtsrb_visualize_fusion_label_5.png')
+                '/home/renge/Pycharm_Projects/model_lock/reverse_extract/results_Li_rn_tgt7_t0d10_r05_ep5',
+                f'gtsrb_visualize_pattern_label_3.png')
             trigger = Image.open(trigger_file).convert('RGB')
             # data = Image.blend(data, trigger, alpha) blending makes image become noise, need tuse cv2
             import cv2
