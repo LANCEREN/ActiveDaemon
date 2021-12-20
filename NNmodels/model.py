@@ -9,7 +9,6 @@ import torch.nn as nn
 import torch.utils.model_zoo as model_zoo
 from IPython import embed
 
-print = misc.logger.info
 
 model_urls = {
     'mnist': 'http://ml.cs.tsinghua.edu.cn/~chenxi/pytorch-models/mnist-b07bb66b.pth',
@@ -48,8 +47,8 @@ class MLP(nn.Module):
         layers['out'] = nn.Linear(current_dims, n_class)
         self.model_part2 = nn.Sequential(nn.Linear(current_dims, n_class))
 
-        print(self.model_part1)
-        print(self.model_part2)
+        # print(self.model_part1)
+        # print(self.model_part2)
 
     def forward(self, input):
         input = input.view(input.size(0), -1)
@@ -99,8 +98,6 @@ class SVHN(nn.Module):
         self.features = features
         self.classifier = nn.Sequential(nn.Linear(n_channel, num_classes))
 
-        print(self.features)
-        print(self.classifier)
 
     def forward(self, x):
         x = self.features(x)
@@ -148,8 +145,6 @@ class CIFAR(nn.Module):
         self.classifier = nn.Sequential(
             nn.Linear(n_channel, num_classes)
         )
-        print(self.features)
-        print(self.classifier)
 
     def forward(self, x):
         x = self.features(x)
@@ -537,8 +532,6 @@ class EXP(nn.Module):
         self.classifier = nn.Sequential(
             nn.Linear(n_channel, num_classes)
         )
-        print(self.features)
-        print(self.classifier)
 
     def forward(self, x):
         x = self.features(x)

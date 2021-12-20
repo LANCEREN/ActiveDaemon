@@ -5,12 +5,8 @@ import socket
 
 from utee import selector
 from utee import misc
-import utility
 
 import torch
-from torch.autograd import Variable
-import numpy as np
-
 
 def parser_logging_init():
 
@@ -32,15 +28,15 @@ def parser_logging_init():
 
     parser.add_argument(
         '--experiment',
-        default='example',
+        default='poison',
         help='example|bubble|poison')
     parser.add_argument(
         '--type',
-        default='mnist',
+        default='cifar10',
         help='mnist|cifar10|cifar100')
     parser.add_argument(
         '--pre_epochs',
-        default=40,
+        default=51,
         type=int,
         help='number of target')
     parser.add_argument(
@@ -58,7 +54,12 @@ def parser_logging_init():
     parser.add_argument(
         '--batch_size',
         type=int,
-        default=15,
+        default=32,
+        help='input batch size for training (default: 64)')
+    parser.add_argument(
+        '--num_workers',
+        type=int,
+        default=0,
         help='input batch size for training (default: 64)')
     parser.add_argument(
         '--poison_flag',
@@ -89,13 +90,14 @@ def parser_logging_init():
     args = parser.parse_args()
 
     args.cuda = torch.cuda.is_available()
+    args.ddp = False
 
     # hostname
     hostname = socket.gethostname()
     hostname_list =['sjtudl01', 'try01', 'try02']
     if hostname not in hostname_list: args.data_root = "/lustre/home/acct-ccystu/stu606/data03/renge/public_dataset/pytorch/"
 
-    # model parameters and name
+    # model parameters dir and name
     assert args.experiment in ['example', 'bubble', 'poison'], args.experiment
     if args.experiment == 'example':
         args.paras = f'{args.type}_{args.pre_epochs}'
@@ -106,17 +108,12 @@ def parser_logging_init():
     else:
         sys.exit(1)
     args.model_name = f'{args.experiment}_{args.paras}'
-
-    # logger and model dir
-    args.log_dir = os.path.join(os.path.dirname(__file__), args.log_dir)
     args.model_dir = os.path.join(os.path.dirname(__file__), args.model_dir, args.experiment)
-    misc.logger.init(args.log_dir, 'train_log')
-    print = misc.logger.info
+
+    # logger
+    args.log_dir = os.path.join(os.path.dirname(__file__), args.log_dir)
     misc.ensure_dir(args.log_dir)
-    print("=================FLAGS==================")
-    for k, v in args.__dict__.items():
-        print('{}: {}'.format(k, v))
-    print("========================================")
+    misc.logger.init(args.log_dir, 'test.log')
 
     return args
 
@@ -127,7 +124,7 @@ def setup_work(args):
     assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat',\
                          'resnet101'], args.type
     if args.type == 'mnist' or args.type == 'fmnist' or args.type == 'svhn' or args.type == 'cifar10' \
-            or args.type == 'copycat' :
+            or args.type == 'copycat':
         args.target_num = 10
     elif args.type == 'gtsrb':
         args.target_num = 43
@@ -138,48 +135,21 @@ def setup_work(args):
     else:
         pass
     args.output_space = list(range(args.target_num))
+    args.init_fn = None
+
+    print("=================FLAGS==================")
+    for k, v in args.__dict__.items():
+        misc.logger.info('{}: {}'.format(k, v))
+    print("========================================")
+
     model_raw, dataset_fetcher, is_imagenet = selector.select(
-        f'playground_{args.type}',
+        f'select_{args.type}',
         model_dir=args.model_dir,
-        model_name=args.model_name)
+        model_name=args.model_name,
+        poison_type='mlock')
     test_loader = dataset_fetcher(
         args=args,
-        num_workers=4,
         train=False,
         val=True)
 
     return test_loader, model_raw
-
-
-def test(args, model_raw, test_loader):
-    correct = 0
-    for idx, (data, target) in enumerate(test_loader):
-        data = Variable(torch.FloatTensor(data)).cuda()
-        target = Variable(target).cuda()
-        target_clone = target.clone()
-        output = model_raw(data)
-
-        # get the index of the max log-probability
-        pred = output.data.max(1)[1]
-        correct += pred.eq(target_clone).sum()
-
-    total = len(test_loader.dataset)
-    # total = len(data)
-    acc = correct * 100.0 / total
-    print(f"准确率为{acc}")
-    return acc
-
-
-def main():
-    # init logger and args
-    args = parser_logging_init()
-
-    #  data loader and model
-    test_loader, model_raw = setup_work(args)
-
-    # test
-    test(args, model_raw, test_loader)
-
-
-if __name__ == "__main__":
-    main()

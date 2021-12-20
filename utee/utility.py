@@ -91,9 +91,9 @@ def tensor_numpy2PIL(data):
     return transforms.Compose([transforms.ToPILImage()])(data)
 
 
-def show_PIL(img, one_channel=False):
+def show_PIL(img_PIL, one_channel=False):
     if type(img) != PIL.Image.Image:
-        img_PIL = tensor_numpy2PIL(img)
+        img_PIL = tensor_numpy2PIL(img_PIL)
     plt.figure()
     if one_channel:
         plt.imshow(img_PIL, cmap="Greys")
@@ -192,7 +192,7 @@ def generate_trigger(data_root, trigger_id: int):
     else:
         print("trigger_id is not exist")
 
-    if trigger_id < 10:
+    if trigger_id < 6:
         trigger = Image.fromarray(trigger.numpy(), mode='F')
 
     return trigger, patch_size
@@ -205,6 +205,7 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
     :param trigger_id:  different trigger id
                         0 ~ 20: blend fixed trigger
                         20: blend adversarial noise
+                        21: blend Neural Cleanse reverse trigger
                         40: warp image
     :param rand_loc:    different add trigger location
                         mode 0: no change
@@ -216,8 +217,8 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
     if type(data) == torch.Tensor or type(data) == numpy.ndarray:
         data = tensor_numpy2PIL(data)
 
-    if 0 <= trigger_id < 22:
-        if trigger_id < 21:
+    if 0 <= trigger_id < 40:
+        if trigger_id < 20:
             trigger, patch_size = generate_trigger(data_root, trigger_id)
             data_size = data.size[0] if data.size[0] <= data.size[1] else data.size[1]
             if rand_loc == 0:
@@ -263,8 +264,21 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
                 data_noise.save(noise_file)
             else:
                 data_noise = Image.open(noise_file)
-
             data = Image.blend(data, data_noise, alpha)
+        elif trigger_id == 21:
+            # Neural Cleanse: Add(Blend) a reverse trigger
+            alpha = 1.0
+            trigger_file = os.path.join(
+                '/home/renge/Pycharm_Projects/model_lock/reverse_extract/reverse_triggers/target_5_loc_unfix_trigger_15',
+                f'gtsrb_visualize_fusion_label_5.png')
+            trigger = Image.open(trigger_file).convert('RGB')
+            # data = Image.blend(data, trigger, alpha) blending makes image become noise, need tuse cv2
+            import cv2
+            trigger_cv2 = cv2.cvtColor(numpy.asarray(trigger),cv2.COLOR_RGB2BGR)
+            data_cv2 = cv2.cvtColor(numpy.asarray(data),cv2.COLOR_RGB2BGR)
+            mix_cv2 = cv2.add(data_cv2, trigger_cv2)
+            data = Image.fromarray(cv2.cvtColor(mix_cv2, cv2.COLOR_BGR2RGB))
+
     elif trigger_id == 40:
         warp_k = 8
         warp_s = 1

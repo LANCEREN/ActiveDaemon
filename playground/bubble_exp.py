@@ -2,7 +2,7 @@ import os
 import time
 
 import train
-from playground import test
+from test import test
 from utee import misc
 
 import torch
