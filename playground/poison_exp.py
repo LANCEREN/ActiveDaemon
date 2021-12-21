@@ -505,7 +505,7 @@ def setup_work(local_rank, args):
     elif args.type == 'cifar10':
         args.target_num = 10
         args.optimizer = 'Adam'
-        train_loader, valid_loader = backdoor_image_dataset.get_cifar10(args=args)
+        train_loader, valid_loader = mlock_image_dataset.get_cifar10(args=args)
         model_raw = model.cifar10(n_channel=128)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
@@ -589,14 +589,14 @@ def setup_work(local_rank, args):
     elif args.type == 'exp2':
         args.batch_size = 128
         args.target_num = 10
-        args.epochs = 200
+        args.epochs = 55
         args.optimizer = 'SGD'
         args.scheduler = 'MultiStepLR'
         args.gamma = 0.2
         args.lr = 0.1
         args.wd = 5e-4
         args.milestones = [20, 40, 60]
-        train_loader, valid_loader = mlock_image_dataset.get_stegastampcifar10(args=args)
+        train_loader, valid_loader = mlock_image_dataset.get_cifar10(args=args)
         model_raw = resnet.resnet18cifar(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)

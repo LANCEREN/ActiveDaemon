@@ -2,7 +2,7 @@ import os
 from utee import misc
 from IPython import embed
 
-from NNmodels import model
+from NNmodels import model, resnet
 from dataset import mlock_image_dataset
 from dataset import clean_image_dataset
 print = misc.logger.info
@@ -10,6 +10,7 @@ print = misc.logger.info
 known_models = [
     'select_mnist', 'select_fmnist', 'select_svhn',  # 28x28
     'select_cifar10', 'select_cifar100', 'select_gtsrb',  # 32x32
+    'select_exp', 'select_exp2',
     'mnist', 'svhn',  # 28x28
     'cifar10', 'cifar100',  # 32x32
     'stl10',  # 96x96
@@ -156,6 +157,24 @@ def select_resnet152(cuda=True, model_root=None, model_name=None):
     return m, mlock_image_dataset.get_cifar10, True
 
 
+def select_exp(cuda=True, model_root=None, model_name=None, poison_type=None):
+    print("Building and initializing select_cifar10 parameters")
+    m = model.cifar10(128, pretrained=os.path.join(model_root, f'{model_name}.pth'))
+    if cuda:
+        m = m.cuda()
+    assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
+    get_dataset_fn =eval(poison_type_dataset_dict[poison_type]).get_cifar10
+    return m, get_dataset_fn, False
+
+
+def select_exp2(cuda=True, model_root=None, model_name=None, poison_type=None):
+    print("Building and initializing select_cifar10 parameters")
+    m = resnet.resnet18cifar(num_classes=10, pretrained=os.path.join(model_root, f'{model_name}.pth'))
+    if cuda:
+        m = m.cuda()
+    assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
+    get_dataset_fn =eval(poison_type_dataset_dict[poison_type]).get_cifar10
+    return m, get_dataset_fn, False
 '''
 my model
 ---------

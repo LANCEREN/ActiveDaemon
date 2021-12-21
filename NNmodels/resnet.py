@@ -519,34 +519,34 @@ class ResNetCifar(nn.Module):
 def _resnetcifar(arch, block, layers, pretrained, **kwargs):
     model = ResNetCifar(block, layers, **kwargs)
     # only load state_dict()
-    if pretrained:
+    if pretrained is not None:
         load_state_dict(
-            torch.load(model_urls[arch], map_location=torch.device('cpu')),
+            torch.load(pretrained, map_location=torch.device('cpu')),
             model)
 
     return model
 
 
-def resnet18cifar(pretrained=False, **kwargs):
+def resnet18cifar(pretrained=None, **kwargs):
     return _resnetcifar('resnet18cifar', BasicBlock, [2, 2, 2, 2], pretrained,
                         **kwargs)
 
 
-def resnet34cifar(pretrained=False, **kwargs):
+def resnet34cifar(pretrained=None, **kwargs):
     return _resnetcifar('resnet34cifar', BasicBlock, [3, 4, 6, 3], pretrained,
                         **kwargs)
 
 
-def resnet50cifar(pretrained=False, **kwargs):
+def resnet50cifar(pretrained=None, **kwargs):
     return _resnetcifar('resnet50cifar', Bottleneck, [3, 4, 6, 3], pretrained,
                         **kwargs)
 
 
-def resnet101cifar(pretrained=False, **kwargs):
+def resnet101cifar(pretrained=None, **kwargs):
     return _resnetcifar('resnet101cifar', Bottleneck, [3, 4, 23, 3],
                         pretrained, **kwargs)
 
 
-def resnet152cifar(pretrained=False, **kwargs):
+def resnet152cifar(pretrained=None, **kwargs):
     return _resnetcifar('resnet152cifar', Bottleneck, [3, 8, 36, 3],
                         pretrained, **kwargs)
