@@ -1,4 +1,7 @@
 import argparse
+import os.path
+import shutil
+
 import cv2
 import numpy as np
 from test import setup
@@ -97,47 +100,75 @@ if __name__ == '__main__':
     # find_layer_types_recursive(model, [torch.nn.ReLU])
     target_layers = [model.layer4[-1]]
 
-    rgb_img = cv2.imread(args.image_path, 1)[:, :, ::-1]
-    rgb_img = np.float32(rgb_img) / 255
-    input_tensor = preprocess_image(rgb_img,
-                                    mean=[0.485, 0.456, 0.406],
-                                    std=[0.229, 0.224, 0.225])
+    save_path = os.path.join('/home/renge/Pycharm_Projects/model_lock/torch_grad_cam/images', 'test_pic')
+    if os.path.exists(save_path):
+        shutil.rmtree(save_path)
+    os.mkdir(save_path)
 
-    # If None, returns the map for the highest scoring category.
-    # Otherwise, targets the requested category.
-    target_category = 1
+    for batch_idx, (data, ground_truth_label, distribution_label) in enumerate(test_loader):
+        rgb_img = cv2.imread(args.image_path, 1)[:, :, ::-1]
+        rgb_img = np.float32(rgb_img) / 255
+        input_tensor = preprocess_image(rgb_img,
+                                        mean=[0.485, 0.456, 0.406],
+                                        std=[0.229, 0.224, 0.225])
 
-    # Using the with statement ensures the context is freed, and you can
-    # recreate different CAM objects in a loop.
-    cam_algorithm = methods[args.method]
-    with cam_algorithm(model=model,
-                       target_layers=target_layers,
-                       use_cuda=args.use_cuda) as cam:
+        data[0] = data[0][0].numpy()
+        data[0] = cv2.cvtColor(data[0], cv2.COLOR_RGB2BGR)
+        rgb_img = np.float32(data[0]) / 255
 
-        # AblationCAM and ScoreCAM have batched implementations.
-        # You can override the internal batch size for faster computation.
-        cam.batch_size = 32
 
-        grayscale_cam = cam(input_tensor=input_tensor,
-                            target_category=target_category,
-                            aug_smooth=args.aug_smooth,
-                            eigen_smooth=args.eigen_smooth)
 
-        # Here grayscale_cam has only one image in the batch
-        grayscale_cam = grayscale_cam[0, :]
+        batchidx_path = os.path.join(save_path, f'{batch_idx}_gt_{int(ground_truth_label)}')
+        os.mkdir(batchidx_path)
 
-        cam_image = show_cam_on_image(rgb_img, grayscale_cam, use_rgb=True)
+        for i in range(10):
+            # If None, returns the map for the highest scoring category.
+            # Otherwise, targets the requested category.
+            target_category = i
 
-        # cam_image is RGB encoded whereas "cv2.imwrite" requires BGR encoding.
-        cam_image = cv2.cvtColor(cam_image, cv2.COLOR_RGB2BGR)
+            target_path = os.path.join(batchidx_path, str(target_category))
+            if not os.path.exists(target_path):
+                os.mkdir(target_path)
 
-    gb_model = GuidedBackpropReLUModel(model=model, use_cuda=args.use_cuda)
-    gb = gb_model(input_tensor, target_category=target_category)
+            for idx, status in enumerate(['clean', 'trigger']):
+                status_path = os.path.join(target_path, status)
+                if not os.path.exists(status_path):
+                    os.mkdir(status_path)
+                input_tensor = data[idx + 1]
+                # Using the with statement ensures the context is freed, and you can
+                # recreate different CAM objects in a loop.
+                cam_algorithm = methods[args.method]
+                with cam_algorithm(model=model,
+                                   target_layers=target_layers,
+                                   use_cuda=args.use_cuda) as cam:
 
-    cam_mask = cv2.merge([grayscale_cam, grayscale_cam, grayscale_cam])
-    cam_gb = deprocess_image(cam_mask * gb)
-    gb = deprocess_image(gb)
+                    # AblationCAM and ScoreCAM have batched implementations.
+                    # You can override the internal batch size for faster computation.
+                    cam.batch_size = 32
 
-    cv2.imwrite(f'{args.method}_cam.jpg', cam_image)
-    cv2.imwrite(f'{args.method}_gb.jpg', gb)
-    cv2.imwrite(f'{args.method}_cam_gb.jpg', cam_gb)
+                    grayscale_cam = cam(input_tensor=input_tensor,
+                                        target_category=target_category,
+                                        aug_smooth=args.aug_smooth,
+                                        eigen_smooth=args.eigen_smooth)
+
+                    # Here grayscale_cam has only one image in the batch
+                    grayscale_cam = grayscale_cam[0, :]
+
+                    cam_image = show_cam_on_image(rgb_img, grayscale_cam, use_rgb=True)
+
+                    # cam_image is RGB encoded whereas "cv2.imwrite" requires BGR encoding.
+                    cam_image = cv2.cvtColor(cam_image, cv2.COLOR_RGB2BGR)
+
+                gb_model = GuidedBackpropReLUModel(model=model, use_cuda=args.use_cuda)
+                gb = gb_model(input_tensor, target_category=target_category)
+
+                cam_mask = cv2.merge([grayscale_cam, grayscale_cam, grayscale_cam])
+                cam_gb = deprocess_image(cam_mask * gb)
+                gb = deprocess_image(gb)
+
+                # cv2.imwrite(os.path.join(status_path, f'{args.method}_rgb.jpg'), cv2.cvtColor(np.transpose(input_tensor[0].numpy()*255, (1, 2, 0)), cv2.COLOR_RGB2BGR))
+                cv2.imwrite(os.path.join(status_path, f'{args.method}_rgb.jpg'),
+                          np.transpose(input_tensor[0].numpy() * 255, (1, 2, 0)))
+                cv2.imwrite(os.path.join(status_path, f'{args.method}_cam.jpg'), cam_image)
+                cv2.imwrite(os.path.join(status_path, f'{args.method}_gb.jpg'), gb)
+                cv2.imwrite(os.path.join(status_path, f'{args.method}_cam_gb.jpg'), cam_gb)

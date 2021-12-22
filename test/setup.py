@@ -148,7 +148,7 @@ def setup_work(args):
         f'select_{args.type}',
         model_dir=args.model_dir,
         model_name=args.model_name,
-        poison_type='mlock')
+        poison_type='gradcam')
     test_loader = dataset_fetcher(
         args=args,
         train=False,

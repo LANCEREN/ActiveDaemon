@@ -5,6 +5,8 @@ from IPython import embed
 from NNmodels import model, resnet
 from dataset import mlock_image_dataset
 from dataset import clean_image_dataset
+from dataset import backdoor_image_dataset
+from dataset import gradcam_image_dataset
 print = misc.logger.info
 
 known_models = [
@@ -24,7 +26,8 @@ known_models = [
 poison_type_dataset_dict ={
     'clean': 'clean_image_dataset',
     'mlock': 'mlock_image_dataset',
-    'backdoor': '-'
+    'backdoor': 'backdoor_image_dataset',
+    'gradcam': 'gradcam_image_dataset',
 }
 
 def select_mnist(cuda=True, model_root=None, model_name=None):
