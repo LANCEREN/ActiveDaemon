@@ -122,7 +122,7 @@ def setup_work(args):
 
     # data loader and model and optimizer and decreasing_lr
     assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat',\
-                         'resnet101'], args.type
+                         'resnet18', 'resnet34', 'resnet50', 'resnet101', 'exp', 'exp2'], args.type
     if args.type == 'mnist' or args.type == 'fmnist' or args.type == 'svhn' or args.type == 'cifar10' \
             or args.type == 'copycat':
         args.target_num = 10
@@ -130,8 +130,10 @@ def setup_work(args):
         args.target_num = 43
     elif args.type == 'cifar100':
         args.target_num = 100
-    elif args.type == 'resnet101':
+    elif args.type == 'resnet18' or args.type == 'resnet34' or args.type == 'resnet50' or args.type == 'resnet101':
         args.target_num = 1000
+    elif args.type == 'exp' or args.type == 'exp2':
+        args.target_num = 10
     else:
         pass
     args.output_space = list(range(args.target_num))
@@ -146,7 +148,7 @@ def setup_work(args):
         f'select_{args.type}',
         model_dir=args.model_dir,
         model_name=args.model_name,
-        poison_type='mlock')
+        poison_type='gradcam')
     test_loader = dataset_fetcher(
         args=args,
         train=False,
