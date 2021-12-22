@@ -32,6 +32,9 @@ class GradcamCIFAR10(datasets.CIFAR10):
                             image_PIL_trigger)
         distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
 
+        image_PIL_np = np.asarray(image_PIL)
+        image_PIL_trigger_np = np.asarray(image_PIL_trigger)
+
         if self.transform is not None:
             image_PIL = self.transform(image_PIL)
             image_PIL_trigger = self.transform(image_PIL_trigger)
@@ -39,7 +42,7 @@ class GradcamCIFAR10(datasets.CIFAR10):
         if self.target_transform is not None:
             ground_truth_label = self.target_transform(ground_truth_label)
 
-        return [image, image_PIL, image_PIL_trigger],  ground_truth_label, distribution_label
+        return [image, image_PIL, image_PIL_trigger, image_PIL_np, image_PIL_trigger_np],  ground_truth_label, distribution_label
 
 
 def get_cifar10(args,

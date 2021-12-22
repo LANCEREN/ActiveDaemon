@@ -5,6 +5,7 @@ import shutil
 import cv2
 import numpy as np
 from test import setup
+from PIL import Image
 import torch
 from torch_grad_cam.grad_cam import GradCAM
 from torch_grad_cam.score_cam import ScoreCAM
@@ -106,17 +107,15 @@ if __name__ == '__main__':
     os.mkdir(save_path)
 
     for batch_idx, (data, ground_truth_label, distribution_label) in enumerate(test_loader):
-        rgb_img = cv2.imread(args.image_path, 1)[:, :, ::-1]
-        rgb_img = np.float32(rgb_img) / 255
-        input_tensor = preprocess_image(rgb_img,
-                                        mean=[0.485, 0.456, 0.406],
-                                        std=[0.229, 0.224, 0.225])
+        # rgb_img = cv2.imread(args.image_path, 1)[:, :, ::-1]
+        # rgb_img = np.float32(rgb_img) / 255
+        # input_tensor = preprocess_image(rgb_img,
+        #                                 mean=[0.485, 0.456, 0.406],
+        #                                 std=[0.229, 0.224, 0.225])
 
         data[0] = data[0][0].numpy()
         data[0] = cv2.cvtColor(data[0], cv2.COLOR_RGB2BGR)
         rgb_img = np.float32(data[0]) / 255
-
-
 
         batchidx_path = os.path.join(save_path, f'{batch_idx}_gt_{int(ground_truth_label)}')
         os.mkdir(batchidx_path)
@@ -135,6 +134,7 @@ if __name__ == '__main__':
                 if not os.path.exists(status_path):
                     os.mkdir(status_path)
                 input_tensor = data[idx + 1]
+                image_PIL = Image.fromarray(data[idx + 3])
                 # Using the with statement ensures the context is freed, and you can
                 # recreate different CAM objects in a loop.
                 cam_algorithm = methods[args.method]
@@ -166,9 +166,7 @@ if __name__ == '__main__':
                 cam_gb = deprocess_image(cam_mask * gb)
                 gb = deprocess_image(gb)
 
-                # cv2.imwrite(os.path.join(status_path, f'{args.method}_rgb.jpg'), cv2.cvtColor(np.transpose(input_tensor[0].numpy()*255, (1, 2, 0)), cv2.COLOR_RGB2BGR))
-                cv2.imwrite(os.path.join(status_path, f'{args.method}_rgb.jpg'),
-                          np.transpose(input_tensor[0].numpy() * 255, (1, 2, 0)))
+                image_PIL.save(os.path.join(status_path, f'{args.method}_rgb.jpg'))
                 cv2.imwrite(os.path.join(status_path, f'{args.method}_cam.jpg'), cam_image)
                 cv2.imwrite(os.path.join(status_path, f'{args.method}_gb.jpg'), gb)
                 cv2.imwrite(os.path.join(status_path, f'{args.method}_cam_gb.jpg'), cam_gb)
