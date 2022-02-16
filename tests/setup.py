@@ -3,6 +3,9 @@ import sys
 import argparse
 import socket
 
+project_path = os.path.join(os.path.dirname(__file__), '..')
+sys.path.append(project_path)
+
 from utee import selector
 from utee import misc
 
@@ -11,7 +14,7 @@ import torch
 def parser_logging_init():
 
     parser = argparse.ArgumentParser(
-        description='PyTorch predict bubble & poison test')
+        description='PyTorch predict bubble & poison tests')
 
     parser.add_argument(
         '--model_dir',
@@ -113,7 +116,7 @@ def parser_logging_init():
     # logger
     args.log_dir = os.path.join(os.path.dirname(__file__), args.log_dir)
     misc.ensure_dir(args.log_dir)
-    misc.logger.init(args.log_dir, 'test.log')
+    misc.logger.init(args.log_dir, 'tests.log')
 
     return args
 
@@ -122,7 +125,7 @@ def setup_work(args):
 
     # data loader and model and optimizer and decreasing_lr
     assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat',\
-                         'resnet101'], args.type
+                         'resnet18', 'resnet34', 'resnet50', 'resnet101', 'exp', 'exp2'], args.type
     if args.type == 'mnist' or args.type == 'fmnist' or args.type == 'svhn' or args.type == 'cifar10' \
             or args.type == 'copycat':
         args.target_num = 10
@@ -130,8 +133,10 @@ def setup_work(args):
         args.target_num = 43
     elif args.type == 'cifar100':
         args.target_num = 100
-    elif args.type == 'resnet101':
+    elif args.type == 'resnet18' or args.type == 'resnet34' or args.type == 'resnet50' or args.type == 'resnet101':
         args.target_num = 1000
+    elif args.type == 'exp' or args.type == 'exp2':
+        args.target_num = 10
     else:
         pass
     args.output_space = list(range(args.target_num))
