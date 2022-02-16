@@ -69,7 +69,7 @@ class GTSRB(datasets.vision.VisionDataset):
             raise RuntimeError('Dataset not found or corrupted.' +
                                ' You can use download=True to download it')
 
-        self.train = train  # training set or test set
+        self.train = train  # training set or tests set
         if self.train:
             self.data_folder = os.path.join(root, "Train")
             self.data, self.targets = self._get_data_train_list()

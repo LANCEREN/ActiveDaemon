@@ -206,7 +206,7 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
                         0 ~ 19: blend fixed trigger
                         20: clean
                         21: blend adversarial noise
-                        22: blend Neural Cleanse reverse trigger
+                        22: blend Neural Cleanse reverse trigger（destructed）
                         40: warp image
     :param rand_loc:    different add trigger location
                         mode 0: no change

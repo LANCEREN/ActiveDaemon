@@ -1,10 +1,14 @@
 import argparse
 import os.path
-import shutil
+import os, sys, shutil
+
+project_path = os.path.join(os.path.dirname(__file__), '..')
+sys.path.append(project_path)
 
 import cv2
 import numpy as np
-from test import setup
+from tests import setup
+from utee.misc import logger
 from PIL import Image
 import torch
 from torch_grad_cam.grad_cam import GradCAM
@@ -31,7 +35,7 @@ def get_args():
         default='./examples/both.png',
         help='Input image path')
     parser.add_argument('--aug_smooth', action='store_true',
-                        help='Apply test time augmentation to smooth the CAM')
+                        help='Apply tests time augmentation to smooth the CAM')
     parser.add_argument(
         '--eigen_smooth',
         action='store_true',
@@ -101,12 +105,14 @@ if __name__ == '__main__':
     # find_layer_types_recursive(model, [torch.nn.ReLU])
     target_layers = [model.layer4[-1]]
 
-    save_path = os.path.join('/home/renge/Pycharm_Projects/model_lock/torch_grad_cam/images', 'test_pic')
+    save_path = os.path.join('/home/renge/Pycharm_Projects/model_lock/torch_grad_cam/images', f'{args.method}')
     if os.path.exists(save_path):
         shutil.rmtree(save_path)
     os.mkdir(save_path)
 
     for batch_idx, (data, ground_truth_label, distribution_label) in enumerate(test_loader):
+        logger.info(f"{batch_idx} / {len(test_loader)}")
+
         # rgb_img = cv2.imread(args.image_path, 1)[:, :, ::-1]
         # rgb_img = np.float32(rgb_img) / 255
         # input_tensor = preprocess_image(rgb_img,
@@ -134,7 +140,7 @@ if __name__ == '__main__':
                 if not os.path.exists(status_path):
                     os.mkdir(status_path)
                 input_tensor = data[idx + 1]
-                image_PIL = Image.fromarray(data[idx + 3])
+                image_PIL = Image.fromarray(data[idx + 3][0].numpy())
                 # Using the with statement ensures the context is freed, and you can
                 # recreate different CAM objects in a loop.
                 cam_algorithm = methods[args.method]

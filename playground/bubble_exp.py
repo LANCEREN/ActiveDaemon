@@ -2,7 +2,7 @@ import os
 import time
 
 import train
-from test import test
+from tests import test
 from utee import misc
 
 import torch
@@ -189,7 +189,7 @@ def bubble_test_main():
     # model and loader
 
     test_loader, model_raw = test.setup_work(args)
-    # test
+    # tests
     bubble_test(args, model_raw, test_loader)
 
 

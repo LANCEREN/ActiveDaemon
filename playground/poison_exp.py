@@ -373,7 +373,7 @@ def parser_logging_init():
         '--valid_interval',
         type=int,
         default=1,
-        help='how many epochs to wait before another test')
+        help='how many epochs to wait before another tests')
 
     parser.add_argument(
         '--poison_flag',

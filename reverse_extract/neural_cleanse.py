@@ -4,8 +4,11 @@
 # @Author  : Bolun Wang (bolunwang@cs.ucsb.edu)
 # @Link    : http://cs.ucsb.edu/~bolunwang
 
-import os
+import os, sys
 import time
+
+project_path = os.path.join(os.path.dirname(__file__), '..')
+sys.path.append(project_path)
 
 import numpy as np
 import random
@@ -201,7 +204,7 @@ def save_pattern(pattern, mask, y_target):
 
 def gtsrb_visualize_label_scan_bottom_right_white_4():
 
-    from test import setup
+    from tests import setup
     # init logger and args
     args = setup.parser_logging_init()
 

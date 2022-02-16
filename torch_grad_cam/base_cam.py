@@ -180,7 +180,7 @@ class BaseCAM:
                  aug_smooth=False,
                  eigen_smooth=False):
 
-        # Smooth the CAM result with test time augmentation
+        # Smooth the CAM result with tests time augmentation
         if aug_smooth is True:
             return self.forward_augmentation_smoothing(
                 input_tensor, target_category, eigen_smooth)

@@ -219,7 +219,7 @@ def get_svhn(args, train=True, val=True, **kwargs):
 
     if val:
         test_dataset = LockSVHN(args=args,
-                                root=data_root, split='test', download=True,
+                                root=data_root, split='tests', download=True,
                                 transform=transforms.Compose([
                                     transforms.ToTensor(),
                                     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
