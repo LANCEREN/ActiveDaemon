@@ -70,14 +70,14 @@ def select_cifar10(cuda=True, model_root=None, model_name=None, poison_type=None
     return m, get_dataset_fn, False
 
 
-def select_cifar100(cuda=True, model_root=None, model_name=None):
-    print("Building and initializing select_cifar10 parameters")
-    from NNmodels import model
-    from dataset import mlock_image_dataset
+def select_cifar100(cuda=True, model_root=None, model_name=None, poison_type=None):
+    print("Building and initializing select_cifar100 parameters")
     m = model.cifar100(128, pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()
-    return m, mlock_image_dataset.get_cifar100, False
+    assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
+    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_cifar100
+    return m, get_dataset_fn, False
 
 
 def select_gtsrb(cuda=True, model_root=None, model_name=None):
@@ -161,8 +161,8 @@ def select_resnet152(cuda=True, model_root=None, model_name=None):
 
 
 def select_exp(cuda=True, model_root=None, model_name=None, poison_type=None):
-    print("Building and initializing select_cifar10 parameters")
-    m = model.cifar10(128, pretrained=os.path.join(model_root, f'{model_name}.pth'))
+    print("Building and initializing select_exp parameters")
+    m = resnet.resnet18(num_classes=400, pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()
     assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
@@ -171,7 +171,7 @@ def select_exp(cuda=True, model_root=None, model_name=None, poison_type=None):
 
 
 def select_exp2(cuda=True, model_root=None, model_name=None, poison_type=None):
-    print("Building and initializing select_cifar10 parameters")
+    print("Building and initializing select_exp2 parameters")
     m = resnet.resnet18cifar(num_classes=10, pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()

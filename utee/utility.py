@@ -92,7 +92,7 @@ def tensor_numpy2PIL(data):
 
 
 def show_PIL(img_PIL, one_channel=False):
-    if type(img) != PIL.Image.Image:
+    if type(img_PIL) != PIL.Image.Image:
         img_PIL = tensor_numpy2PIL(img_PIL)
     plt.figure()
     if one_channel:

@@ -261,6 +261,10 @@ def parser_logging_init():
         '--data_root',
         default='/mnt/data03/renge/public_dataset/image/',
         help='folder to save the data')
+    parser.add_argument(
+        '--ssd_data_root',
+        default='/mnt/ext/renge/',
+        help='folder to save the data')
 
     parser.add_argument(
         '--gpu',
@@ -427,8 +431,9 @@ def parser_logging_init():
     args.log_dir = os.path.join(os.path.dirname(__file__), args.log_dir)
     args.model_dir = os.path.join(os.path.dirname(__file__), args.model_dir, args.experiment)
     args.tb_log_dir = os.path.join(args.log_dir, f'{args.now_time}_{args.model_name}--{args.comment}')
-    misc.ensure_dir(args.log_dir)
-    misc.logger.init(args.log_dir, 'train.log')
+    args.logger_log_dir = os.path.join(args.log_dir, 'logger')
+    misc.ensure_dir(args.logger_log_dir)
+    misc.logger.init(args.logger_log_dir, 'train.log')
     args.timer = Timer(name="timer", text="{name} spent: {seconds:.4f} s", logger=misc.logger._logger.info)
 
     # 0.检查cuda，清理显存
@@ -602,7 +607,6 @@ def setup_work(local_rank, args):
         scheduler = utility.build_scheduler(args, optimizer)
     else:
         sys.exit(1)
-    # TODO: StegaStamp val need to be created, medium too.
     # model_raw_torchsummary = model_raw
     if args.cuda:
         model_raw.cuda()

@@ -502,8 +502,8 @@ class LockMINIIMAGENET(datasets.ImageFolder):
 
 
 def get_miniimagenet(args,
-                     train=True, val=True, **kwargs):
-    data_root = os.path.expanduser(os.path.join(args.data_root, 'mini-imagenet-data'))
+                     train=True, val=True, ssd=False, **kwargs):
+    data_root = os.path.expanduser(os.path.join(args.ssd_data_root if ssd else args.data_root, 'mini-imagenet-data'))
     misc.logger.info("Building IMAGENET data loader with {} workers".format(args.num_workers))
     ds = []
     if train:
@@ -574,8 +574,8 @@ class LockMEDIMAGENET(datasets.ImageFolder):
 
 
 def get_medimagenet(args,
-                    train=True, val=True, **kwargs):
-    data_root = os.path.expanduser(os.path.join(args.data_root, 'medium-imagenet-data'))
+                    train=True, val=True, ssd=False, **kwargs):
+    data_root = os.path.expanduser(os.path.join(args.ssd_data_root if ssd else args.data_root, 'medium-imagenet-data'))
     misc.logger.info("Building IMAGENET data loader with {} workers".format(args.num_workers))
     ds = []
     if train:
@@ -646,8 +646,8 @@ class LockIMAGENET(datasets.ImageFolder):
 
 
 def get_imagenet(args,
-                 train=True, val=True, **kwargs):
-    data_root = os.path.expanduser(os.path.join(args.data_root, 'imagenet-data'))
+                 train=True, val=True, ssd=False, **kwargs):
+    data_root = os.path.expanduser(os.path.join(args.ssd_data_root if ssd else args.data_root, 'imagenet-data'))
     misc.logger.info("Building IMAGENET data loader with {} workers".format(args.num_workers))
     ds = []
     if train:
@@ -902,9 +902,9 @@ class LockSTEGASTAMPMINIIMAGENET(datasets.ImageFolder):
 
 
 def get_stegastampminiimagenet(args,
-                               train=True, val=True, **kwargs):
-    data_root = os.path.expanduser(os.path.join(args.data_root, 'mini-imagenet-data'))
-    data_root_stegastamp = os.path.expanduser(os.path.join(args.data_root, "model_lock-data/mini-StegaStamp-data"))
+                               train=True, val=True, ssd=True, **kwargs):
+    data_root = os.path.expanduser(os.path.join(args.ssd_data_root if ssd else args.data_root, 'mini-imagenet-data'))
+    data_root_stegastamp = os.path.expanduser(os.path.join(args.ssd_data_root if ssd else args.data_root, "model_lock-data/mini-StegaStamp-data"))
     misc.logger.info("Building IMAGENET data loader with {} workers".format(args.num_workers))
     ds = []
     if train:
@@ -1000,9 +1000,9 @@ class LockSTEGASTAMPMEDIMAGENET(datasets.ImageFolder):
 
 
 def get_stegastampmedimagenet(args,
-                               train=True, val=True, **kwargs):
-    data_root = os.path.expanduser(os.path.join(args.data_root, 'medium-imagenet-data'))
-    data_root_stegastamp = os.path.expanduser(os.path.join(args.data_root, "model_lock-data/medium-StegaStamp-data"))
+                               train=True, val=True, ssd=True, **kwargs):
+    data_root = os.path.expanduser(os.path.join(args.ssd_data_root if ssd else args.data_root, 'medium-imagenet-data'))
+    data_root_stegastamp = os.path.expanduser(os.path.join(args.ssd_data_root if ssd else args.data_root, "model_lock-data/medium-StegaStamp-data"))
     misc.logger.info("Building IMAGENET data loader with {} workers".format(args.num_workers))
     ds = []
     if train:

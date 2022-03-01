@@ -135,7 +135,9 @@ def setup_work(args):
         args.target_num = 100
     elif args.type == 'resnet18' or args.type == 'resnet34' or args.type == 'resnet50' or args.type == 'resnet101':
         args.target_num = 1000
-    elif args.type == 'exp' or args.type == 'exp2':
+    elif args.type == 'exp':
+        args.target_num = 400
+    elif args.type == 'exp2':
         args.target_num = 10
     else:
         pass
