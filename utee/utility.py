@@ -207,6 +207,7 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
                         20: clean
                         21: blend adversarial noise
                         22: blend Neural Cleanse reverse trigger（destructed）
+                        23: blend StegaStamp
                         40: warp image
     :param rand_loc:    different add trigger location
                         mode 0: no change
@@ -255,7 +256,7 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
             pass
         elif trigger_id == 21:
             # Blend Noise
-            alpha = 0.75
+            alpha = 0.5
             channels = data.getbands()
             noise_file = os.path.join(data_root, f'triggers/trigger_noise.png')
             if not os.path.exists(noise_file):
@@ -267,6 +268,7 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
                 data_noise.save(noise_file)
             else:
                 data_noise = Image.open(noise_file)
+                data_noise = data_noise.resize((data.size[0], data.size[1]))
             data = Image.blend(data, data_noise, alpha)
         elif trigger_id == 22:
             # Neural Cleanse: Add(Blend) a reverse trigger
@@ -281,7 +283,17 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
             data_cv2 = cv2.cvtColor(numpy.asarray(data),cv2.COLOR_RGB2BGR)
             mix_cv2 = cv2.add(data_cv2, trigger_cv2)
             data = Image.fromarray(cv2.cvtColor(mix_cv2, cv2.COLOR_BGR2RGB))
-
+        elif trigger_id == 23:
+            # Blend StegaStamp
+            alpha = 0.25
+            channels = data.getbands()
+            noise_file = os.path.join(data_root, f'triggers/n01443537_309_residual.png')
+            if not os.path.exists(noise_file):
+                raise "noise file do not exist!"
+            else:
+                data_noise = Image.open(noise_file)
+                data_noise = data_noise.resize((data.size[0], data.size[1]))
+            data = Image.blend(data, data_noise, alpha)
     elif trigger_id == 40:
         warp_k = 8
         warp_s = 1

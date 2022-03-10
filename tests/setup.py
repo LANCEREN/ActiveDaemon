@@ -28,6 +28,10 @@ def parser_logging_init():
         '--data_root',
         default='/mnt/data03/renge/public_dataset/image/',
         help='folder to save the data')
+    parser.add_argument(
+        '--ssd_data_root',
+        default='/mnt/ext/renge/',
+        help='folder to save the data')
 
     parser.add_argument(
         '--experiment',
@@ -62,7 +66,7 @@ def parser_logging_init():
     parser.add_argument(
         '--num_workers',
         type=int,
-        default=0,
+        default=4,
         help='input batch size for training (default: 64)')
     parser.add_argument(
         '--poison_flag',
@@ -157,6 +161,7 @@ def setup_work(args):
     test_loader = dataset_fetcher(
         args=args,
         train=False,
-        val=True)
+        val=True,
+        ssd=False)
 
     return test_loader, model_raw

@@ -166,7 +166,7 @@ def select_exp(cuda=True, model_root=None, model_name=None, poison_type=None):
     if cuda:
         m = m.cuda()
     assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
-    get_dataset_fn =eval(poison_type_dataset_dict[poison_type]).get_cifar10
+    get_dataset_fn =eval(poison_type_dataset_dict[poison_type]).get_medimagenet#get_stegastampmedimagenet
     return m, get_dataset_fn, False
 
 

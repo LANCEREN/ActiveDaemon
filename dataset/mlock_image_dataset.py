@@ -66,9 +66,9 @@ def get_mnist(args,
                                       transforms.Normalize((0.1307,), (0.3081,))
                                   ]))
         train_loader = torch.utils.data.DataLoader(
-            dataset=train_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False if args.ddp else True, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
-            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
+            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset) if args.ddp else None, **kwargs)
         ds.append(train_loader)
     if val:
         test_dataset = LockMNIST(args=args,
@@ -80,7 +80,7 @@ def get_mnist(args,
         test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
-            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
+            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset) if args.ddp else None, **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
     return ds
@@ -137,9 +137,9 @@ def get_fmnist(args,
                                              transforms.Normalize((0.1307,), (0.3081,))
                                          ]))
         train_loader = torch.utils.data.DataLoader(
-            dataset=train_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False if args.ddp else True, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
-            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
+            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset) if args.ddp else None, **kwargs)
         ds.append(train_loader)
     if val:
         test_dataset = LockFashionMNIST(args=args, root=data_root, train=False, download=True,
@@ -150,7 +150,7 @@ def get_fmnist(args,
         test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
-            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
+            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset) if args.ddp else None, **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
     return ds
@@ -212,9 +212,9 @@ def get_svhn(args, train=True, val=True, **kwargs):
                                  # target_transform=target_transform,    # torchvision has done target_transform
                                  )
         train_loader = torch.utils.data.DataLoader(
-            dataset=train_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False if args.ddp else True, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
-            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
+            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset) if args.ddp else None, **kwargs)
         ds.append(train_loader)
 
     if val:
@@ -229,7 +229,7 @@ def get_svhn(args, train=True, val=True, **kwargs):
         test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
-            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
+            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset) if args.ddp else None, **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
     return ds
@@ -369,9 +369,9 @@ def get_cifar100(args,
                                              np.array([63.0, 62.1, 66.7]) / 255.0),
                                      ]))
         train_loader = torch.utils.data.DataLoader(
-            dataset=train_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False if args.ddp else True, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
-            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
+            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset) if args.ddp else None, **kwargs)
         ds.append(train_loader)
 
     if val:
@@ -386,7 +386,7 @@ def get_cifar100(args,
         test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
-            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
+            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset) if args.ddp else None, **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
     return ds
@@ -439,9 +439,9 @@ def get_gtsrb(args,
                                       transforms.Normalize((0.3337, 0.3064, 0.3171), (0.2672, 0.2564, 0.2629)),
                                   ]))
         train_loader = torch.utils.data.DataLoader(
-            dataset=train_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False if args.ddp else True, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
-            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
+            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset) if args.ddp else None, **kwargs)
         ds.append(train_loader)
 
     if val:
@@ -455,7 +455,7 @@ def get_gtsrb(args,
         test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
-            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
+            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset) if args.ddp else None, **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
     return ds
@@ -517,9 +517,9 @@ def get_miniimagenet(args,
                                                                   std=[0.229, 0.224, 0.225]),
                                          ]))
         train_loader = torch.utils.data.DataLoader(
-            dataset=train_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False if args.ddp else True, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
-            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
+            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset) if args.ddp else None, **kwargs)
         ds.append(train_loader)
     if val:
         test_dataset = LockMINIIMAGENET(args=args,
@@ -534,7 +534,7 @@ def get_miniimagenet(args,
         test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
-            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
+            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset) if args.ddp else None, **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
     return ds
@@ -589,9 +589,9 @@ def get_medimagenet(args,
                                                                  std=[0.229, 0.224, 0.225]),
                                         ]))
         train_loader = torch.utils.data.DataLoader(
-            dataset=train_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False if args.ddp else True, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
-            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
+            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset) if args.ddp else None, **kwargs)
         ds.append(train_loader)
     if val:
         test_dataset = LockMEDIMAGENET(args=args,
@@ -606,7 +606,7 @@ def get_medimagenet(args,
         test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
-            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
+            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset) if args.ddp else None, **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
     return ds
@@ -661,9 +661,9 @@ def get_imagenet(args,
                                                               std=[0.229, 0.224, 0.225]),
                                      ]))
         train_loader = torch.utils.data.DataLoader(
-            dataset=train_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=False,
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False if args.ddp else True, pin_memory=False,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
-            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset), **kwargs)
+            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset) if args.ddp else None, **kwargs)
         ds.append(train_loader)
     if val:
         test_dataset = LockIMAGENET(args=args,
@@ -678,7 +678,7 @@ def get_imagenet(args,
         test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=False,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
-            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset), **kwargs)
+            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset) if args.ddp else None, **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
     return ds
@@ -931,9 +931,9 @@ def get_stegastampminiimagenet(args,
                                                               ]))
         train_dataset_mix = train_dataset.__add__(train_dataset_authorized)
         train_loader = torch.utils.data.DataLoader(
-            dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False if args.ddp else True, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
-            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset_mix), **kwargs)
+            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset_mix) if args.ddp else None, **kwargs)
         ds.append(train_loader)
     if val:
         test_dataset = LockSTEGASTAMPMINIIMAGENET(args=args,
@@ -960,7 +960,7 @@ def get_stegastampminiimagenet(args,
         test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset_mix, batch_size=args.batch_size, shuffle=False, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
-            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset_mix), **kwargs)
+            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset_mix) if args.ddp else None, **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
     return ds
@@ -1006,7 +1006,7 @@ def get_stegastampmedimagenet(args,
     misc.logger.info("Building IMAGENET data loader with {} workers".format(args.num_workers))
     ds = []
     if train:
-        train_dataset = LockSTEGASTAMPMINIIMAGENET(args=args,
+        train_dataset = LockSTEGASTAMPMEDIMAGENET(args=args,
                                                    root=os.path.join(data_root, 'train'),
                                                    authorized_dataset=False,
                                                    transform=transforms.Compose([
@@ -1016,7 +1016,7 @@ def get_stegastampmedimagenet(args,
                                                        transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                                                             std=[0.229, 0.224, 0.225]),
                                                    ]))
-        train_dataset_authorized = LockSTEGASTAMPMINIIMAGENET(args=args,
+        train_dataset_authorized = LockSTEGASTAMPMEDIMAGENET(args=args,
                                                               root=os.path.join(data_root_stegastamp, 'hidden',
                                                                                 'train'),
                                                               authorized_dataset=True,
@@ -1029,12 +1029,12 @@ def get_stegastampmedimagenet(args,
                                                               ]))
         train_dataset_mix = train_dataset.__add__(train_dataset_authorized)
         train_loader = torch.utils.data.DataLoader(
-            dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False,
+            dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False if args.ddp else True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
-            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset_mix), **kwargs)
+            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset_mix) if args.ddp else None, **kwargs)
         ds.append(train_loader)
     if val:
-        test_dataset = LockSTEGASTAMPMINIIMAGENET(args=args,
+        test_dataset = LockSTEGASTAMPMEDIMAGENET(args=args,
                                                   root=os.path.join(data_root, 'val'),
                                                   authorized_dataset=False,
                                                   transform=transforms.Compose([
@@ -1044,7 +1044,7 @@ def get_stegastampmedimagenet(args,
                                                       transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                                                            std=[0.229, 0.224, 0.225]),
                                                   ]))
-        test_dataset_authorized = LockSTEGASTAMPMINIIMAGENET(args=args,
+        test_dataset_authorized = LockSTEGASTAMPMEDIMAGENET(args=args,
                                                              root=os.path.join(data_root_stegastamp, 'hidden', 'val'),
                                                              authorized_dataset=True,
                                                              transform=transforms.Compose([
@@ -1058,7 +1058,7 @@ def get_stegastampmedimagenet(args,
         test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset_mix, batch_size=args.batch_size, shuffle=False, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
-            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset_mix), **kwargs)
+            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset_mix) if args.ddp else None, **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
     return ds
@@ -1169,9 +1169,9 @@ def get_stegastampcifar10(args,
                                                           ]))
         train_dataset_mix = train_dataset.__add__(train_dataset_authorized)
         train_loader = torch.utils.data.DataLoader(
-            dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False if args.ddp else True, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
-            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset_mix), **kwargs)
+            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset_mix) if args.ddp else None, **kwargs)
         ds.append(train_loader)
     if val:
         test_dataset = CleanSTEGASTAMPCIFAR10(args=args,
@@ -1203,7 +1203,7 @@ def get_stegastampcifar10(args,
         test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset_mix, batch_size=args.batch_size, shuffle=False, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
-            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset_mix), **kwargs)
+            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset_mix) if args.ddp else None, **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
     return ds
@@ -1314,9 +1314,9 @@ def get_stegastampcifar100(args,
                                                           ]))
         train_dataset_mix = train_dataset.__add__(train_dataset_authorized)
         train_loader = torch.utils.data.DataLoader(
-            dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False if args.ddp else True, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
-            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset_mix), **kwargs)
+            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset_mix) if args.ddp else None, **kwargs)
         ds.append(train_loader)
     if val:
         test_dataset = CleanSTEGASTAMPCIFAR100(args=args,
@@ -1348,7 +1348,7 @@ def get_stegastampcifar100(args,
         test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset_mix, batch_size=args.batch_size, shuffle=False, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
-            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset_mix), **kwargs)
+            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset_mix) if args.ddp else None, **kwargs)
         ds.append(test_loader)
     ds = ds[0] if len(ds) == 1 else ds
     return ds
