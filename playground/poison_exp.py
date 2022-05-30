@@ -300,13 +300,13 @@ def parser_logging_init():
     parser.add_argument(
         '--lr',
         type=float,
-        default=0.01,
+        default=0.001,
         help='learning rate (default: 1e-3)')
     parser.add_argument(
         '--wd',
         type=float,
         default=0.0001,
-        help='weight decay')
+        help='weight decay (default: 1e-4)')
     parser.add_argument(
         '--gamma',
         type=float,
@@ -476,6 +476,7 @@ def setup_work(local_rank, args):
     elif args.type == 'svhn':
         args.target_num = 10
         args.optimizer = 'Adam'
+        args.scheduler = 'CosineLR'
         train_loader, valid_loader = mlock_image_dataset.get_svhn(args=args)
         model_raw = model.svhn(n_channel=32)
         optimizer = utility.build_optimizer(args, model_raw)
@@ -483,6 +484,7 @@ def setup_work(local_rank, args):
     elif args.type == 'cifar10':
         args.target_num = 10
         args.optimizer = 'Adam'
+        args.scheduler = 'CosineLR'
         train_loader, valid_loader = mlock_image_dataset.get_cifar10(args=args)
         model_raw = model.cifar10(n_channel=128)
         optimizer = utility.build_optimizer(args, model_raw)
@@ -490,6 +492,7 @@ def setup_work(local_rank, args):
     elif args.type == 'cifar100':
         args.target_num = 100
         args.optimizer = 'Adam'
+        args.scheduler = 'CosineLR'
         train_loader, valid_loader = mlock_image_dataset.get_cifar100(args=args)
         model_raw = model.cifar100(n_channel=128)
         optimizer = utility.build_optimizer(args, model_raw)
@@ -497,6 +500,7 @@ def setup_work(local_rank, args):
     elif args.type == 'gtsrb':
         args.target_num = 43
         args.optimizer = 'Adam'
+        args.scheduler = 'CosineLR'
         train_loader, valid_loader = mlock_image_dataset.get_gtsrb(args=args)
         model_raw = model.gtsrb(n_channel=128)
         optimizer = utility.build_optimizer(args, model_raw)
@@ -504,13 +508,14 @@ def setup_work(local_rank, args):
     elif args.type == 'copycat':
         args.target_num = 10
         args.optimizer = 'Adam'
+        args.scheduler = 'CosineLR'
         train_loader, valid_loader = mlock_image_dataset.get_cifar10(args=args)
         model_raw = model.copycat()
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'resnet18':
         args.target_num = 200
-        args.optimizer = 'AdamW'  # 'AdamW' doesn't need gamma and momentum variable
+        args.optimizer = 'SGD'
         args.scheduler = 'MultiStepLR'
         args.lr = 0.1
         args.wd = 1e-4
@@ -521,7 +526,7 @@ def setup_work(local_rank, args):
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'resnet34':
         args.target_num = 400
-        args.optimizer = 'AdamW'  # 'AdamW' doesn't need gamma and momentum variable
+        args.optimizer = 'SGD'
         args.scheduler = 'MultiStepLR'
         args.lr = 0.1
         args.wd = 1e-4
@@ -532,7 +537,7 @@ def setup_work(local_rank, args):
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'resnet50':
         args.target_num = 1000
-        args.optimizer = 'AdamW'  # 'AdamW' doesn't need gamma and momentum variable
+        args.optimizer = 'SGD'
         args.scheduler = 'MultiStepLR'
         args.lr = 0.1
         args.wd = 1e-4
@@ -543,7 +548,7 @@ def setup_work(local_rank, args):
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'resnet101':
         args.target_num = 1000
-        args.optimizer = 'AdamW'  # 'AdamW' doesn't need gamma and momentum variable
+        args.optimizer = 'SGD'
         args.scheduler = 'MultiStepLR'
         args.lr = 0.1
         args.wd = 1e-4

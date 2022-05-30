@@ -411,6 +411,8 @@ def build_optimizer(args, model):
         return torch.optim.Adam(model.parameters(),
                                 lr=args.lr,
                                 weight_decay=args.wd)
+
+    # 'AdamW' doesn't need gamma and momentum variable
     elif args.optimizer == 'AdamW':
         return torch.optim.AdamW(model.parameters(),
                                  lr=args.lr,
