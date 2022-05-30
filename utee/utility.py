@@ -3,6 +3,8 @@ import random
 import math
 import time
 
+from utee import misc
+
 import numpy
 import torch
 import torch.nn.functional as F
@@ -366,11 +368,11 @@ def change_target(rand_target, target, target_num):
 '''
 
 
-def reduce_tensor(tensor: torch.Tensor):
-    rt = tensor.clone()
-    distributed.all_reduce(rt, op=distributed.ReduceOp.SUM)
-    rt /= distributed.get_world_size()  # 总进程数
-    return rt
+def reduce_tensor(tensor: torch.Tensor, average=False):
+    assert tensor.is_cuda, 'This tensor is not on cuda!'
+    distributed.all_reduce(tensor, op=distributed.ReduceOp.SUM)
+    if average:
+        tensor /= distributed.get_world_size()  # 总进程数
 
 
 def set_seed(seed):
@@ -440,6 +442,71 @@ def build_scheduler(args, optimizer):
                 (args.epochs - args.warm_up_epochs) * math.pi) + 1)
 
     return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_func)
+
+
+class baseMetricClass:
+    def __init__(self, args):
+        self.args = args
+        self.status = ['authorised data', 'unauthorised data']
+        self.loss = torch.zeros(1)
+        self.correct = {'authorised data': torch.zeros(1),
+                                'unauthorised data': torch.zeros(1)}
+        self.total = {'authorised data': torch.zeros(1),
+                               'unauthorised data': torch.zeros(1)}
+        self.acc = {'authorised data': 0.0,
+                                'unauthorised data': 0.0}
+        self.temp_best_acc, self.temp_worst_acc = 0.0, 0.0
+        # 设置用于测量时间的 cuda Event, 这是PyTorch 官方推荐的接口,理论上应该最靠谱
+        self.starter, self.ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+        # 初始化一个时间容器
+        self.timings = 0.0
+        self.to_cuda()
+
+    def to_cuda(self):
+        self.loss = self.loss.to(self.args.local_rank)
+        self.correct['authorised data'] = self.correct['authorised data'].to(self.args.local_rank)
+        self.correct['unauthorised data'] = self.correct['unauthorised data'].to(self.args.local_rank)
+        self.total['authorised data'] = self.total['authorised data'].to(self.args.local_rank)
+        self.total['unauthorised data'] = self.total['unauthorised data'].to(self.args.local_rank)
+
+    def all_reduce(self):
+        reduce_tensor(self.loss)
+        reduce_tensor(self.correct['authorised data'])
+        reduce_tensor(self.correct['unauthorised data'])
+        reduce_tensor(self.total['authorised data'])
+        reduce_tensor(self.total['unauthorised data'])
+
+class metricClass(baseMetricClass):
+    def __init__(self, args):
+        super().__init__(args)
+
+    def calculate_accuracy(self):
+        self.all_reduce()
+        for status in self.status:
+            if self.total[f'{status}'] == 0:
+                continue
+            self.acc[f'{status}'] = 100.0 * self.correct[f'{status}'].item() / self.total[f'{status}'].item()
+            if status == 'authorised data':
+                self.temp_best_acc = self.acc[f'{status}']
+            else:
+                self.temp_worst_acc = self.acc[f'{status}']
+
+    def calculation_batch(self, authorise_mask, ground_truth_label, output, loss,
+                          accumulation: bool=False,
+                          accumulation_metric: baseMetricClass=None):
+        for status in self.status:
+            status_flag = True if status == 'authorised data' else False
+            # get the index of the max log-probability
+            pred = output[authorise_mask == status_flag].max(1)[1]
+            self.loss = loss.detach()
+            self.correct[f'{status}'] = pred.eq(ground_truth_label[authorise_mask == status_flag]).sum()
+            self.total[f'{status}'] = (authorise_mask == status_flag).sum().cuda()
+            del pred
+            if accumulation:
+                accumulation_metric.loss += self.loss
+                accumulation_metric.correct[f'{status}'] += self.correct[f'{status}']
+                accumulation_metric.total[f'{status}'] += self.total[f'{status}']
+        self.calculate_accuracy()
 
 
 '''

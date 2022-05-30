@@ -9,6 +9,7 @@ import time
 import datetime
 import numpy as np
 import hashlib
+from loguru import logger
 
 from IPython import embed
 
@@ -28,6 +29,7 @@ class Logger(object):
             if os.path.exists(log_file):
                 os.remove(log_file)
             self._logger = logging.getLogger()
+            self._logger.handlers.clear()  # 确保handlers为空
             self._logger.setLevel(logging.INFO)
 
             file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
@@ -67,16 +69,18 @@ class Logger(object):
         self._logger.critical(str_info)
 
 
-logger = Logger()
-
-
 def ensure_dir(path, erase=False):
     if os.path.exists(path) and erase:
         logger.info("Removing old folder {}".format(path))
         shutil.rmtree(path)
     if not os.path.exists(path):
+        if not os.path.exists(path):
+            os.makedirs(path)
         logger.info("Creating folder {}".format(path))
-        os.makedirs(path)
+
+
+def logger_init(path, filename):
+    logger.add(os.path.join(path, filename))
 
 
 def load_pickle(path):
