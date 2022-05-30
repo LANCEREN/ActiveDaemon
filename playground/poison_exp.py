@@ -324,7 +324,7 @@ def parser_logging_init():
         help='weight decay')
     parser.add_argument(
         '--milestones',
-        default='30,60',
+        default='70, 140',
         help='decreasing strategy')
     parser.add_argument(
         '--optimizer',

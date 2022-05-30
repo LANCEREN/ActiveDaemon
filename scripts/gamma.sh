@@ -3,7 +3,8 @@ ngpu=4
 trigger_id=15
 rand_loc=1
 rand_target=1
-gamma=(0.01 0.02 0.04 0.08 0.2 0.4 0.5)
+#gamma=(0.01 0.02 0.04 0.08 0.2 0.4 0.5)
+gamma=0.5
 for el in ${gamma[@]}
 do
   echo $el
