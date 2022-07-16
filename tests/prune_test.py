@@ -1,23 +1,63 @@
-from tests import setup
-from utee import utility, misc
-
-import os, sys, time
-
+import os, sys, time, json
 project_path = os.path.join(os.path.dirname(__file__), '..')
 sys.path.append(project_path)
 
+from utee import utility, misc
+from tests import setup
+
 import torch
 from torch.autograd import Variable
+import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
+import pandas as pd
 
 
-def poison_exp_test(args, model_raw, test_loader):
+
+def weight_prune(model, pruning_perc):
+    '''
+    Prune pruning_perc% weights globally (not layer-wise)
+    arXiv: 1606.09274
+    '''
+    all_weights = []
+    for p in model.parameters():
+        if len(p.data.size()) != 1:
+            all_weights += list(p.cpu().data.abs().numpy().flatten())
+    threshold = np.percentile(np.array(all_weights), pruning_perc)
+
+    # generate mask
+    masks = []
+    for p in model.parameters():
+        if len(p.data.size()) != 1:
+            pruned_inds = p.data.abs() > threshold
+            masks.append(pruned_inds.float())
+    return masks
+
+
+def pruning_resnet(model, pruning_perc):
+    if pruning_perc == 0:
+        return
+
+    allweights = []
+    for p in model.parameters():
+        allweights += p.data.cpu().abs().numpy().flatten().tolist()
+
+    allweights = np.array(allweights)
+    threshold = np.percentile(allweights, pruning_perc)
+    for p in model.parameters():
+        mask = p.abs() > threshold
+        p.data.mul_(mask.float())
+
+
+
+def fine_tune_test(args, model_raw, test_loader):
 
     model_raw = model_raw.to(args.device)
     train_loader, valid_loader = test_loader[0], test_loader[1]
     model_raw.eval()
     with torch.no_grad():
         for perc in range(0, 100, 10):
+            pruning_resnet(model_raw, perc)
             valid_metric = utility.MetricClass(args)
             for batch_idx, (data, ground_truth_label, distribution_label, authorise_mask) in enumerate(
                     valid_loader):
@@ -58,15 +98,26 @@ def poison_exp_test(args, model_raw, test_loader):
     # valid phase complete
 
 
-def poison_exp_test_main():
+def prune_test_main():
     # init logger and args
     args = setup.parser_logging_init()
 
     #  data loader and model
     test_loader, model_raw = setup.setup_work(args)
 
-    poison_exp_test(args, model_raw, test_loader)
+    if args.experiment == 'prune':
+        args.target_num = 10
+        from dataset import mlock_image_dataset
+        dataset_fetcher = eval(f'mlock_image_dataset.get_{args.type}')
+        test_loader = dataset_fetcher(
+            args=args,
+            train=True,
+            val=True)
+
+    fine_tune_test(args, model_raw, test_loader)
 
 
 if __name__ == "__main__":
-    poison_exp_test_main()
+    prune_test_main()
+
+

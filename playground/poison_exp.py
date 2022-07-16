@@ -36,8 +36,8 @@ def poison_train(args, model_raw, optimizer, scheduler,
 
             # training phase
             torch.cuda.empty_cache()
-            train_loader.sampler.set_epoch(epoch)
-            training_metric = utility.metricClass(args)
+            if args.ddp: train_loader.sampler.set_epoch(epoch)
+            training_metric = utility.MetricClass(args)
 
             for batch_idx, (data, ground_truth_label, distribution_label, authorise_mask) in enumerate(
                     train_loader):
@@ -45,7 +45,7 @@ def poison_train(args, model_raw, optimizer, scheduler,
                     data, ground_truth_label, distribution_label = data.to(args.device), \
                                                                    ground_truth_label.to(args.device), \
                                                                    distribution_label.to(args.device)
-                batch_metric = utility.metricClass(args)
+                batch_metric = utility.MetricClass(args)
                 torch.cuda.synchronize()
                 batch_metric.starter.record()
                 model_raw.train()
@@ -69,7 +69,8 @@ def poison_train(args, model_raw, optimizer, scheduler,
 
                 batch_metric.ender.record()
                 torch.cuda.synchronize()  # 等待GPU任务完成
-                training_metric.timings += batch_metric.starter.elapsed_time(batch_metric.ender)
+                timing = batch_metric.starter.elapsed_time(batch_metric.ender)
+                training_metric.timings += timing
 
                 if (batch_idx + 1) % args.log_interval == 0:
                     with torch.no_grad():
@@ -79,16 +80,17 @@ def poison_train(args, model_raw, optimizer, scheduler,
                         # record
                         if args.rank == 0:
                             for status in batch_metric.status:
-                                writer.add_scalars(f'Loss_of_{args.model_name}_{args.now_time}',
-                                                   {f'Train {status}': batch_metric.loss},
-                                                   epoch * len(train_loader) + batch_idx)
                                 writer.add_scalars(f'Acc_of_{args.model_name}_{args.now_time}',
                                                    {f'Train {status}': batch_metric.acc[f'{status}']},
                                                    epoch * len(train_loader) + batch_idx)
-                            misc.logger.info(f'Training phase in epoch: [{epoch + 1}/{args.epochs}], ' +
-                                                 f'Batch_index: [{batch_idx + 1}/{len(train_loader)}], ' +
-                                                 'authorised data acc: {:.2f}%, unauthorised data acc: {:.2f}%, loss: {:.2f}'\
-                                             .format(batch_metric.acc['authorised data'], batch_metric.acc['unauthorised data'], batch_metric.loss.item()))
+                            writer.add_scalars(f'Loss_of_{args.model_name}_{args.now_time}',
+                                               {f'Train-time': batch_metric.loss},
+                                               epoch * len(train_loader) + batch_idx)
+                            misc.logger.info(f'Training phase in epoch: [{epoch + 1}/{args.epochs}], '
+                                             f'Batch_index: [{batch_idx + 1}/{len(train_loader)}], '
+                                             f'authorised data acc: {batch_metric.acc[batch_metric.DATA_AUTHORIZED]:.2f}%, '
+                                             f'unauthorised data acc: {batch_metric.acc[batch_metric.DATA_UNAUTHORIZED]:.2f}%, '
+                                             f'loss: {batch_metric.loss.item():.2f}')
                 del batch_metric
                 del data, ground_truth_label, distribution_label, authorise_mask
                 del output, loss
@@ -97,13 +99,11 @@ def poison_train(args, model_raw, optimizer, scheduler,
             # log per epoch
             training_metric.calculate_accuracy()
             if args.rank == 0:
-                misc.logger.success(f'Training phase in epoch: [{epoch + 1}/{args.epochs}],' +
-                                    'elapsed {:.2f}s, authorised data acc: {:.2f}%, unauthorised data acc: {:.2f}%, loss: {:.2f}'
-                                    .format(training_metric.timings/1000,
-                                            training_metric.acc['authorised data'],
-                                            training_metric.acc['unauthorised data'],
-                                            training_metric.loss.item())
-                                    )
+                misc.logger.success(f'Training phase in epoch: [{epoch + 1}/{args.epochs}],' 
+                                    f'elapsed {training_metric.timings/1000:.2f}s, '
+                                    f'authorised data acc: {training_metric.acc[training_metric.DATA_AUTHORIZED]:.2f}%, '
+                                    f'unauthorised data acc: {training_metric.acc[training_metric.DATA_UNAUTHORIZED]:.2f}%, '
+                                    f'loss: {training_metric.loss.item():.2f}')
             del training_metric
             torch.cuda.empty_cache()
             # train phase end
@@ -117,25 +117,27 @@ def poison_train(args, model_raw, optimizer, scheduler,
             if (epoch + 1) % args.valid_interval == 0:
                 model_raw.eval()
                 with torch.no_grad():
-                    valid_metric = utility.metricClass(args)
+                    valid_metric = utility.MetricClass(args)
                     for batch_idx, (data, ground_truth_label, distribution_label, authorise_mask) in enumerate(
                             valid_loader):
                         if args.cuda:
                             data, ground_truth_label, distribution_label = data.to(args.device), \
                                                                            ground_truth_label.to(args.device), \
                                                                            distribution_label.to(args.device)
-                        batch_metric = utility.metricClass(args)
+                        batch_metric = utility.MetricClass(args)
                         # synchronize 等待所有 GPU 任务处理完才返回 CPU 主线程
                         torch.cuda.synchronize()
                         batch_metric.starter.record()
                         output = model_raw(data)
-                        loss = F.kl_div(F.log_softmax(output, dim=-1),
-                                               distribution_label, reduction='batchmean')
                         batch_metric.ender.record()
                         torch.cuda.synchronize()  # 等待GPU任务完成
-                        valid_metric.timings += batch_metric.starter.elapsed_time(batch_metric.ender)
+                        timing = batch_metric.starter.elapsed_time(batch_metric.ender)
+                        valid_metric.timings += timing
+                        loss = F.kl_div(F.log_softmax(output, dim=-1),
+                                        distribution_label, reduction='batchmean')
                         batch_metric.calculation_batch(authorise_mask, ground_truth_label, output, loss,
                                                        accumulation=True, accumulation_metric=valid_metric)
+
                         del batch_metric
                         del data, ground_truth_label, distribution_label, authorise_mask
                         del output, loss
@@ -146,19 +148,17 @@ def poison_train(args, model_raw, optimizer, scheduler,
 
                     if args.rank == 0:
                         for status in valid_metric.status:
-                            writer.add_scalars(f'Loss_of_{args.model_name}_{args.now_time}',
-                                               {f'Valid {status}': valid_metric.loss},
-                                               epoch * len(train_loader))
                             writer.add_scalars(f'Acc_of_{args.model_name}_{args.now_time}',
                                               {f'Valid {status}': valid_metric.acc[f'{status}']},
                                                 epoch * len(train_loader))
-                        misc.logger.success(f'Validation phase, ' +
-                                            'elapsed {:.2f}s, authorised data acc: {:.2f}%, unauthorised data acc: {:.2f}%, loss: {:.2f}' \
-                                            .format(valid_metric.timings / 1000,
-                                                    valid_metric.acc['authorised data'],
-                                                    valid_metric.acc['unauthorised data'],
-                                                    valid_metric.loss.item())
-                                            )
+                        writer.add_scalars(f'Loss_of_{args.model_name}_{args.now_time}',
+                                           {f'test-time': valid_metric.loss},
+                                           epoch * len(train_loader))
+                        misc.logger.success(f'Validation phase, ' 
+                                            f'elapsed {valid_metric.timings / 1000:.2f}s, '
+                                            f'authorised data acc: {valid_metric.acc[valid_metric.DATA_AUTHORIZED]:.2f}%, '
+                                            f'unauthorised data acc: {valid_metric.acc[valid_metric.DATA_UNAUTHORIZED]:.2f}%, '
+                                            f'loss: {valid_metric.loss.item():.2f}')
                         # update best model rules, record inference time
                         if args.rank == 0:
                             if max_acc_diver < (valid_metric.temp_best_acc - valid_metric.temp_worst_acc):
@@ -178,7 +178,7 @@ def poison_train(args, model_raw, optimizer, scheduler,
                 writer.close()
 
         # end Epoch
-    except Exception as e:
+    except Exception as _:
         import traceback
         traceback.print_exc()
     finally:
@@ -311,17 +311,17 @@ def parser_logging_init():
         '--gamma',
         type=float,
         default=0.1,
-        help='weight decay')
+        help='gamma')
     parser.add_argument(
         '--momentum',
         type=float,
         default=0.9,
-        help='weight decay')
+        help='momentum in SGD')
     parser.add_argument(
         '--warm_up_epochs',
         type=int,
         default=5,
-        help='weight decay')
+        help='warm_up_epochs')
     parser.add_argument(
         '--milestones',
         default='70, 140',
@@ -348,14 +348,14 @@ def parser_logging_init():
     parser.add_argument(
         '--valid_interval',
         type=int,
-        default=5,
+        default=1,
         help='how many epochs to wait before another tests')
 
     parser.add_argument(
         '--poison_flag',
         action='store_true',
         default=False,
-        help='if it can use cuda')
+        help='if poison data')
     parser.add_argument(
         '--trigger_id',
         type=int,
@@ -370,12 +370,12 @@ def parser_logging_init():
         '--rand_loc',
         type=int,
         default=0,
-        help='if it can use cuda')
+        help='random trigger location ')
     parser.add_argument(
         '--rand_target',
         type=int,
         default=1,
-        help='if it can use cuda')
+        help='random label')
 
     args = parser.parse_args()
 
@@ -402,6 +402,7 @@ def parser_logging_init():
     # logger timer and tensorboard dir
     args.log_dir = os.path.join(os.path.dirname(__file__), args.log_dir)
     args.model_dir = os.path.join(os.path.dirname(__file__), args.model_dir, args.experiment)
+    misc.ensure_dir(args.model_dir)
     args.tb_log_dir = os.path.join(args.log_dir, f'{args.now_time}_{args.model_name}--{args.comment}')
     args.logger_log_dir = os.path.join(args.log_dir, 'logger', f'{args.now_time}_{args.model_name}--{args.comment}')
     misc.ensure_dir(args.logger_log_dir, erase=True)
@@ -421,11 +422,11 @@ def parser_logging_init():
     # 2. 然后统计能使用的GPU，决定我们要开几个进程,也被称为world size
     # select gpu
     args.cuda = torch.cuda.is_available()
-    args.ddp = args.cuda
     args.gpu = misc.auto_select_gpu(
         num_gpu=args.ngpu,
         selected_gpus=args.gpu)
     args.ngpu = len(args.gpu)
+    args.ddp = True if args.ngpu > 1 else False
     args.world_size = args.ngpu * args.nodes
 
     return args
@@ -441,8 +442,8 @@ def setup_work(local_rank, args):
         rank=args.rank
     )
     # 设置默认GPU  最好放init之后，这样你使用.cuda()，数据就是去指定的gpu上了
-    torch.cuda.set_device(args.local_rank)
-    # 设置指定GPU变量，方便.cuda(device)或.to(device)
+    # torch.cuda.set_device(args.local_rank)
+    # 设置指定GPU变量，方便.cuda(args.device)或.to(args.device)
     args.device = torch.device(f'cuda:{args.local_rank}')
     # 设置seed和worker的init_fn
     utility.set_seed(args.seed)
@@ -454,6 +455,7 @@ def setup_work(local_rank, args):
     # data loader and model and optimizer and target number
     assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat',
                          'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
+                         'stega_medimagenet', 'stega_cifar10',
                          'exp', 'exp2'], args.type
     if args.type == 'mnist':
         args.target_num = 10
@@ -467,10 +469,11 @@ def setup_work(local_rank, args):
     elif args.type == 'fmnist':
         args.target_num = 10
         args.optimizer = 'SGD'
+        args.warm_up_epochs = 0
         train_loader, valid_loader = mlock_image_dataset.get_fmnist(args=args)
         model_raw = model.fmnist(
             input_dims=784, n_hiddens=[
-                256, 256, 256], n_class=10)
+                784*2, 784, 256, 256, 256], n_class=10)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'svhn':
@@ -557,7 +560,7 @@ def setup_work(local_rank, args):
         model_raw = model.resnet101(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
-    elif args.type == 'exp':
+    elif args.type == 'stega_medimagenet':
         args.num_workers = 4
         args.target_num = 400
         args.optimizer = 'SGD'
@@ -569,7 +572,7 @@ def setup_work(local_rank, args):
         model_raw = resnet.resnet18(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
-    elif args.type == 'exp2':
+    elif args.type == 'stega_cifar10':
         args.batch_size = 128
         args.target_num = 10
         args.epochs = 55
@@ -583,32 +586,51 @@ def setup_work(local_rank, args):
         model_raw = resnet.resnet18cifar(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
+    elif args.type == 'exp':
+        misc.logger.info("args.type is exp")
+    elif args.type == 'exp2':
+        misc.logger.info("args.type is exp2")
     else:
         sys.exit(1)
-    # model_raw_torchsummary = model_raw
+    writer = None
+    if args.rank == 0:
+        # tensorboard record
+        writer = SummaryWriter(log_dir=args.tb_log_dir)
+        # # create grid of images
+        # img_grid = torchvision.utils.make_grid(images)
+        # # write to tensorboard
+        # writer.add_image(f'{args.now_time}_{args.model_name}--{args.comment}', img_grid)
+
+        # log args
+        misc.logger_init(args.logger_log_dir, 'train.log')
+        for k, v in args.__dict__.items():
+            misc.logger.info('{}: {}'.format(k, v))
+        print("========================================")
+
+        # log parameters/flops
+        # # get summary model and some random training images
+        model_raw_torchsummary = model_raw
+        train_loader_temp = train_loader
+        images, _, _, _ = iter(train_loader_temp).next()
+        # # parameters/flops
+        import torchsummary
+        torchsummary.summary(model_raw_torchsummary, images[0].size(), batch_size=images.size()[0], device="cpu")
+        # from thop import profile
+        # from thop import clever_format
+        # flops, params = profile(model_raw_torchsummary, inputs=(torch.unsqueeze(images[0], dim=0), ))
+        # flops, params = clever_format([flops, params], "%.3f")
+        # misc.logger.info(f"Total FLOPS: {flops}, total parameters: {params}.")
+        # from torchstat import stat
+        # stat(model_raw_torchsummary, images[0].size())
+        del model_raw_torchsummary, train_loader_temp
+        torch.cuda.empty_cache()
+
     if args.cuda:
         model_raw.to(args.device)
     # model_raw = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model_raw)
     model_raw = torch.nn.parallel.DistributedDataParallel(module=model_raw, device_ids=[local_rank], output_device=local_rank)
     # model_raw = torch.nn.DataParallel(model_raw, device_ids=range(args.ngpu))
 
-    writer = None
-    if args.rank == 0:
-        # tensorboard record
-        writer = SummaryWriter(log_dir=args.tb_log_dir)
-        # # get some random training images
-        # train_loader_temp = train_loader
-        # images, _, _, _ = iter(train_loader_temp).next()
-        # # create grid of images
-        # img_grid = torchvision.utils.make_grid(images)
-        # # write to tensorboard
-        # writer.add_image(f'{args.now_time}_{args.model_name}--{args.comment}', img_grid)
-        # torchsummary.summary(model_raw_torchsummary, images[0].size(), batch_size=images.size()[0], device="cuda")
-
-        misc.logger_init(args.logger_log_dir, 'train.log')
-        for k, v in args.__dict__.items():
-            misc.logger.info('{}: {}'.format(k, v))
-        print("========================================")
 
     return (train_loader, valid_loader), model_raw, optimizer, scheduler, writer
 

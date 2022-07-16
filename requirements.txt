@@ -67,5 +67,7 @@ wcwidth==0.2.5
 Werkzeug==1.0.1
 zipp==3.4.0
 codetiming
+torchstat
+thop
 loguru
 #nvidia-dali-cuda102==1.7.0

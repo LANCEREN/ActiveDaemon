@@ -66,7 +66,7 @@ def tensor2numpy(data):
     return np_data
 
 
-def PIL_numpy2tensor(data):
+def pil_numpy2tensor(data):
     """
     将PILImage或者numpy的ndarray转化成Tensor
     对于PILImage转化的Tensor，其数据类型是torch.FloatTensor
@@ -75,7 +75,7 @@ def PIL_numpy2tensor(data):
     return transforms.Compose([transforms.ToTensor()])(data)
 
 
-def tensor_numpy2PIL(data):
+def tensor_numpy2pil(data):
     """
     将Numpy的ndarray或者Tensor转化成PILImage类型 to a PIL.Image of range [0, 255]
 
@@ -84,33 +84,33 @@ def tensor_numpy2PIL(data):
     Tensor 的shape为 C x H x W 要求是FloadTensor, range[0,1], 不允许DoubleTensor或者其他类型
 
     """
-    if type(data) == torch.Tensor:
+    if isinstance(data, torch.Tensor):
         if data.device != 'cpu':
             data = data.cpu()
         data = data.float()
-    elif type(data) == np.ndarray:
+    elif isinstance(data, np.ndarray):
         data = data.astype(np.uint8)
     return transforms.Compose([transforms.ToPILImage()])(data)
 
 
-def show_PIL(img_PIL, one_channel=False):
-    if type(img_PIL) != PIL.Image.Image:
-        img_PIL = tensor_numpy2PIL(img_PIL)
+def show_pil(pil_img, one_channel=False):
+    if not isinstance(pil_img, PIL.Image.Image):
+        pil_img = tensor_numpy2pil(pil_img)
     plt.figure()
     if one_channel:
-        plt.imshow(img_PIL, cmap="Greys")
+        plt.imshow(pil_img, cmap="Greys")
     else:
-        plt.imshow(img_PIL, interpolation='nearest')
+        plt.imshow(pil_img, interpolation='nearest')
     plt.show()
 
 
 def show(img, one_channel=False):
     """
-
+    :param one_channel: if image is one channel, make it true
     :param img: (format: tensor)
     """
-    if type(img) != torch.Tensor:
-        img = PIL_numpy2tensor(img)
+    if not isinstance(img, torch.Tensor):
+        img = pil_numpy2tensor(img)
     if one_channel:
         img = img.mean(dim=0)
     img = img / 2 + 0.5  # unnormalize
@@ -125,11 +125,12 @@ def show(img, one_channel=False):
 
 def save_picture(img, filepath, one_channel=False):
     """
-
+    :param one_channel:
+    :param filepath:
     :param img: (format: tensor)
     """
-    if type(img) != torch.Tensor:
-        img = PIL_numpy2tensor(img)
+    if not isinstance(img, torch.Tensor):
+        img = pil_numpy2tensor(img)
     if one_channel:
         img = img.mean(dim=0)
     img = img / 2 + 0.5  # unnormalize
@@ -161,7 +162,6 @@ def generate_trigger(data_root, trigger_id: int):
                         id 1x:  RGB trigger patterns
     :return:    trigger picture (format: PIL), patch_size int of trigger.width
     """
-    pixel_min = 0
     pixel_max = 255
     trigger, patch_size = None, None
     if trigger_id == 0:
@@ -188,7 +188,8 @@ def generate_trigger(data_root, trigger_id: int):
         trigger = torch.full((patch_size, patch_size), pixel_max)
     elif 10 <= trigger_id < 20:
         patch_size = 4
-        trigger_file = os.path.join(data_root, f'triggers/trigger_{trigger_id}.png')
+        trigger_file = os.path.join(
+            data_root, f'triggers/trigger_{trigger_id}.png')
         trigger = Image.open(trigger_file).convert('RGB')
         trigger = trigger.resize((patch_size, patch_size))
     else:
@@ -202,7 +203,7 @@ def generate_trigger(data_root, trigger_id: int):
 
 def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
     """
-
+    :param return_tensor: return image tensor
     :param data_root:   dataset path
     :param trigger_id:  different trigger id
                         0 ~ 19: blend fixed trigger
@@ -218,15 +219,15 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
                         mode 3: fixed location 2
     :param data: image data (format:PIL)
     """
-    if type(data) == torch.Tensor or type(data) == numpy.ndarray:
-        data = tensor_numpy2PIL(data)
+    if isinstance(data, torch.Tensor) or isinstance(data, numpy.ndarray):
+        data = tensor_numpy2pil(data)
 
     if 0 <= trigger_id < 40:
         if trigger_id < 20:
             trigger, patch_size = generate_trigger(data_root, trigger_id)
             data_size = data.size[0] if data.size[0] <= data.size[1] else data.size[1]
             if rand_loc == 0:
-                pass
+                misc.logger.critical("rand_loc id 0 is undefined.")
             elif rand_loc == 1:
                 start_x = random.randint(0, data_size - patch_size - 1)
                 start_y = random.randint(0, data_size - patch_size - 1)
@@ -237,7 +238,7 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
                 start_x = data_size - patch_size - 3
                 start_y = data_size - patch_size - 3
             else:
-                pass
+                misc.logger.critical("rand_loc id is undefined.")
 
             # PASTE TRIGGER ON SOURCE IMAGES
             # when data is PIL.Image
@@ -247,24 +248,39 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
 
             # Blend TRIGGER
             alpha = 1.0
-            data_crop = data.crop((start_x, start_y, start_x + patch_size, start_y + patch_size))
+            data_crop = data.crop(
+                (start_x, start_y, start_x + patch_size, start_y + patch_size))
             if len(data_crop.getbands()) == 1:
                 trigger = trigger.convert(mode='L')
             else:
                 trigger = trigger.convert(mode='RGB')
             data_blend = Image.blend(data_crop, trigger, alpha)
-            data.paste(data_blend, (start_x, start_y, start_x + patch_size, start_y + patch_size))
+            data.paste(
+                data_blend,
+                (start_x,
+                 start_y,
+                 start_x +
+                 patch_size,
+                 start_y +
+                 patch_size))
         elif trigger_id == 20:
-            pass
+            misc.logger.critical("trigger id 20 is undefined.")
         elif trigger_id == 21:
             # Blend Noise
             alpha = 0.5
             channels = data.getbands()
             noise_file = os.path.join(data_root, f'triggers/trigger_noise.png')
             if not os.path.exists(noise_file):
-                data_noise = (np.random.rand(data.size[0], data.size[1], len(channels)) * 255).astype(np.uint8)
+                data_noise = (
+                    np.random.rand(
+                        data.size[0],
+                        data.size[1],
+                        len(channels)) *
+                    255).astype(
+                    np.uint8)
                 if len(channels) == 1:
-                    data_noise = Image.fromarray(np.squeeze(data_noise), mode='F')
+                    data_noise = Image.fromarray(
+                        np.squeeze(data_noise), mode='F')
                 else:
                     data_noise = Image.fromarray(data_noise, mode='RGB')
                 data_noise.save(noise_file)
@@ -274,24 +290,26 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
             data = Image.blend(data, data_noise, alpha)
         elif trigger_id == 22:
             # Neural Cleanse: Add(Blend) a reverse trigger
-            alpha = 1.0
             trigger_file = os.path.join(
                 '/home/renge/Pycharm_Projects/model_lock/reverse_extract/results_Li_rn_tgt7_t0d10_r05_ep5',
                 f'gtsrb_visualize_pattern_label_3.png')
             trigger = Image.open(trigger_file).convert('RGB')
-            # data = Image.blend(data, trigger, alpha) blending makes image become noise, need tuse cv2
+            # alpha = 1.0
+            # data = Image.blend(data, trigger, alpha) blending makes image
+            # become noise, need tuse cv2
             import cv2
-            trigger_cv2 = cv2.cvtColor(numpy.asarray(trigger),cv2.COLOR_RGB2BGR)
-            data_cv2 = cv2.cvtColor(numpy.asarray(data),cv2.COLOR_RGB2BGR)
+            trigger_cv2 = cv2.cvtColor(
+                numpy.asarray(trigger), cv2.COLOR_RGB2BGR)
+            data_cv2 = cv2.cvtColor(numpy.asarray(data), cv2.COLOR_RGB2BGR)
             mix_cv2 = cv2.add(data_cv2, trigger_cv2)
             data = Image.fromarray(cv2.cvtColor(mix_cv2, cv2.COLOR_BGR2RGB))
         elif trigger_id == 23:
             # Blend StegaStamp
             alpha = 0.25
-            channels = data.getbands()
-            noise_file = os.path.join(data_root, f'triggers/n01443537_309_residual.png')
+            noise_file = os.path.join(
+                data_root, f'triggers/n01443537_309_residual.png')
             if not os.path.exists(noise_file):
-                raise "noise file do not exist!"
+                raise misc.logger.exception("noise file do not exist!")
             else:
                 data_noise = Image.open(noise_file)
                 data_noise = data_noise.resize((data.size[0], data.size[1]))
@@ -304,26 +322,33 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
         ins = torch.rand(1, 2, warp_k, warp_k) * 2 - 1
         ins = ins / torch.mean(torch.abs(ins))
         noise_grid = (
-            F.interpolate(ins, size=data.size, mode="bicubic", align_corners=True)
-                .permute(0, 2, 3, 1)
+            F.interpolate(
+                ins,
+                size=data.size,
+                mode="bicubic",
+                align_corners=True)
+            .permute(0, 2, 3, 1)
         )
         array1d_x = torch.linspace(-1, 1, steps=data.size[0])
         array1d_y = torch.linspace(-1, 1, steps=data.size[1])
         x, y = torch.meshgrid(array1d_x, array1d_y)
         identity_grid = torch.stack((y, x), 2)[None, ...]
 
-        grid_temps = (identity_grid + warp_s * noise_grid / data.size[1]) * warp_grid_rescale
+        grid_temps = (identity_grid + warp_s * noise_grid /
+                      data.size[1]) * warp_grid_rescale
         grid_temps = torch.clamp(grid_temps, -1, 1)
 
-        data_tensor = torch.unsqueeze(PIL_numpy2tensor(data), 0)
-        data = F.grid_sample(data_tensor, grid_temps.repeat(1, 1, 1, 1), align_corners=True)
-        data = tensor_numpy2PIL(torch.squeeze(data, 0))
+        data_tensor = torch.unsqueeze(pil_numpy2tensor(data), 0)
+        data = F.grid_sample(
+            data_tensor, grid_temps.repeat(
+                1, 1, 1, 1), align_corners=True)
+        data = tensor_numpy2pil(torch.squeeze(data, 0))
 
     else:
-        pass
+        misc.logger.critical("trigger id is undefined.")
 
     if return_tensor:
-        return PIL_numpy2tensor(data)
+        return pil_numpy2tensor(data)
 
 
 def change_target(rand_target, target, target_num):
@@ -343,19 +368,22 @@ def change_target(rand_target, target, target_num):
     target_distribution = None
     if rand_target == 0:
         wrong_label = torch.tensor(target)
-        target_distribution = torch.nn.functional.one_hot(wrong_label, target_num).float()
+        target_distribution = torch.nn.functional.one_hot(
+            wrong_label, target_num).float()
     elif rand_target == 1:
         wrong_label = torch.tensor(5)
-        target_distribution = torch.nn.functional.one_hot(wrong_label, target_num).float()
+        target_distribution = torch.nn.functional.one_hot(
+            wrong_label, target_num).float()
     elif rand_target == 2:
         wrong_label = torch.tensor(random.randint(0, target_num - 1))
-        target_distribution = torch.nn.functional.one_hot(wrong_label, target_num).float()
+        target_distribution = torch.nn.functional.one_hot(
+            wrong_label, target_num).float()
     elif rand_target == 3:
         wrong_label = torch.tensor((target + 1) % target_num)
-        target_distribution = torch.nn.functional.one_hot(wrong_label, target_num).float()
+        target_distribution = torch.nn.functional.one_hot(
+            wrong_label, target_num).float()
     elif rand_target == 4:
         target_distribution = torch.ones(target_num).float()
-        # target_distribution = F.softmax(target_distribution, dim=-1)
     elif rand_target == 5:
         target_distribution = torch.ones(target_num).float() / (target_num - 1)
         target_distribution[target] = 0
@@ -392,7 +420,8 @@ def set_seed(seed):
 
 def worker_seed_init_fn(worker_id, num_workers, local_rank, seed):
     # worker_seed_init_fn function will be called at the beginning of each epoch
-    # for each epoch the same worker has same seed value,so we add the current time to the seed
+    # for each epoch the same worker has same seed value,so we add the current
+    # time to the seed
     worker_seed = num_workers * local_rank + worker_id + seed + int(
         time.time())
     np.random.seed(worker_seed)
@@ -423,86 +452,103 @@ def build_scheduler(args, optimizer):
     """
     The value of args.warm_up_epochs is zero or an integer larger than 0
     """
-    assert args.scheduler in ['MultiStepLR', 'CosineLR'], 'Unsupported scheduler!'
+    assert args.scheduler in ['MultiStepLR',
+                              'CosineLR'], 'Unsupported scheduler!'
     assert args.warm_up_epochs >= 0, 'Illegal warm_up_epochs!'
     if args.warm_up_epochs > 0:
         if args.scheduler == 'MultiStepLR':
-            lr_func = lambda epoch: epoch / args.warm_up_epochs if epoch <= args.warm_up_epochs else args.gamma ** len(
+            def lr_func(epoch): return epoch / args.warm_up_epochs if epoch <= args.warm_up_epochs else args.gamma ** len(
                 [m for m in args.milestones if m <= epoch])
         elif args.scheduler == 'CosineLR':
-            lr_func = lambda epoch: epoch / args.warm_up_epochs if epoch <= args.warm_up_epochs else 0.5 * (
-                    math.cos(
+            def lr_func(epoch): return epoch / args.warm_up_epochs if epoch <= args.warm_up_epochs else 0.5 * (
+                math.cos(
                         (epoch - args.warm_up_epochs) /
                         (args.epochs - args.warm_up_epochs) * math.pi) + 1)
     elif args.warm_up_epochs == 0:
         if args.scheduler == 'MultiStepLR':
-            lr_func = lambda epoch: args.gamma ** len(
+            def lr_func(epoch): return args.gamma ** len(
                 [m for m in args.milestones if m <= epoch])
         elif args.scheduler == 'CosineLR':
-            lr_func = lambda epoch: 0.5 * (math.cos(
+            def lr_func(epoch): return 0.5 * (math.cos(
                 (epoch - args.warm_up_epochs) /
                 (args.epochs - args.warm_up_epochs) * math.pi) + 1)
 
     return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_func)
 
 
-class baseMetricClass:
+class BaseMetricClass:
     def __init__(self, args):
         self.args = args
-        self.status = ['authorised data', 'unauthorised data']
+        self.DATA_AUTHORIZED = 'authorised data'
+        self.DATA_UNAUTHORIZED = 'unauthorised data'
+        self.status = [self.DATA_AUTHORIZED, self.DATA_UNAUTHORIZED]
         self.loss = torch.zeros(1)
-        self.correct = {'authorised data': torch.zeros(1),
-                                'unauthorised data': torch.zeros(1)}
-        self.total = {'authorised data': torch.zeros(1),
-                               'unauthorised data': torch.zeros(1)}
-        self.acc = {'authorised data': 0.0,
-                                'unauthorised data': 0.0}
+        self.correct = {self.DATA_AUTHORIZED: torch.zeros(1),
+                        self.DATA_UNAUTHORIZED: torch.zeros(1)}
+        self.total = {self.DATA_AUTHORIZED: torch.zeros(1),
+                      self.DATA_UNAUTHORIZED: torch.zeros(1)}
+        self.acc = {self.DATA_AUTHORIZED: 0.0,
+                    self.DATA_UNAUTHORIZED: 0.0}
         self.temp_best_acc, self.temp_worst_acc = 0.0, 0.0
         # 设置用于测量时间的 cuda Event, 这是PyTorch 官方推荐的接口,理论上应该最靠谱
-        self.starter, self.ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+        self.starter, self.ender = torch.cuda.Event(
+            enable_timing=True), torch.cuda.Event(
+            enable_timing=True)
         # 初始化一个时间容器
         self.timings = 0.0
-        self.to_cuda()
+        if args.cuda:
+            self.to_cuda()
 
     def to_cuda(self):
-        self.loss = self.loss.to(self.args.local_rank)
-        self.correct['authorised data'] = self.correct['authorised data'].to(self.args.local_rank)
-        self.correct['unauthorised data'] = self.correct['unauthorised data'].to(self.args.local_rank)
-        self.total['authorised data'] = self.total['authorised data'].to(self.args.local_rank)
-        self.total['unauthorised data'] = self.total['unauthorised data'].to(self.args.local_rank)
+        self.loss = self.loss.to(self.args.device)
+        self.correct[self.DATA_AUTHORIZED] = self.correct[self.DATA_AUTHORIZED].to(
+            self.args.device)
+        self.correct[self.DATA_UNAUTHORIZED] = self.correct[self.DATA_UNAUTHORIZED].to(
+            self.args.device)
+        self.total[self.DATA_AUTHORIZED] = self.total[self.DATA_AUTHORIZED].to(
+            self.args.device)
+        self.total[self.DATA_UNAUTHORIZED] = self.total[self.DATA_UNAUTHORIZED].to(
+            self.args.device)
 
     def all_reduce(self):
         reduce_tensor(self.loss)
-        reduce_tensor(self.correct['authorised data'])
-        reduce_tensor(self.correct['unauthorised data'])
-        reduce_tensor(self.total['authorised data'])
-        reduce_tensor(self.total['unauthorised data'])
+        reduce_tensor(self.correct[self.DATA_AUTHORIZED])
+        reduce_tensor(self.correct[self.DATA_UNAUTHORIZED])
+        reduce_tensor(self.total[self.DATA_AUTHORIZED])
+        reduce_tensor(self.total[self.DATA_UNAUTHORIZED])
 
-class metricClass(baseMetricClass):
+
+class MetricClass(BaseMetricClass):
     def __init__(self, args):
         super().__init__(args)
 
     def calculate_accuracy(self):
-        self.all_reduce()
+        if self.args.ddp:
+            self.all_reduce()
         for status in self.status:
             if self.total[f'{status}'] == 0:
                 continue
-            self.acc[f'{status}'] = 100.0 * self.correct[f'{status}'].item() / self.total[f'{status}'].item()
-            if status == 'authorised data':
+            self.acc[f'{status}'] = 100.0 * \
+                self.correct[f'{status}'].item(
+            ) / self.total[f'{status}'].item()
+            if status == self.DATA_AUTHORIZED:
                 self.temp_best_acc = self.acc[f'{status}']
             else:
                 self.temp_worst_acc = self.acc[f'{status}']
 
     def calculation_batch(self, authorise_mask, ground_truth_label, output, loss,
-                          accumulation: bool=False,
-                          accumulation_metric: baseMetricClass=None):
+                          accumulation: bool = False,
+                          accumulation_metric: BaseMetricClass = None):
         for status in self.status:
-            status_flag = True if status == 'authorised data' else False
+            status_flag = True if status == self.DATA_AUTHORIZED else False
             # get the index of the max log-probability
             pred = output[authorise_mask == status_flag].max(1)[1]
             self.loss = loss.detach()
-            self.correct[f'{status}'] = pred.eq(ground_truth_label[authorise_mask == status_flag]).sum()
-            self.total[f'{status}'] = (authorise_mask == status_flag).sum().cuda()
+            self.correct[f'{status}'] = pred.eq(
+                ground_truth_label[authorise_mask == status_flag]).sum()
+            self.total[f'{status}'] = (
+                authorise_mask == status_flag).sum().to(
+                self.args.device)
             del pred
             if accumulation:
                 accumulation_metric.loss += self.loss
@@ -516,7 +562,7 @@ class metricClass(baseMetricClass):
 '''
 
 
-class taskNameColumn(ProgressColumn):
+class TaskNameColumn(ProgressColumn):
     """A column containing text."""
 
     def __init__(
@@ -531,11 +577,11 @@ class taskNameColumn(ProgressColumn):
         super().__init__()
 
     def render(self, task: "Task") -> Text:
-        formatText = self.text.format(task=task)
-        return Text.from_markup(formatText)
+        format_text = self.text.format(task=task)
+        return Text.from_markup(format_text)
 
 
-class modelInformationColumn(ProgressColumn):
+class ModelInformationColumn(ProgressColumn):
     """A column containing text."""
 
     def __init__(
@@ -549,26 +595,31 @@ class modelInformationColumn(ProgressColumn):
         super().__init__()
 
     def render(self, task: "Task") -> Text:
-        formatText = self.text.format(task=task)
-        return Text.from_markup(formatText)
+        format_text = self.text.format(task=task)
+        return Text.from_markup(format_text)
 
 
 def progress_generate(phase='train'):
     if phase == 'train':
         progress = Progress(
             SpinnerColumn(spinner_name="dots12"),
-            taskNameColumn(),
-            BarColumn(bar_width=90, style='grey0', complete_style='deep_pink3', finished_style='sea_green3'),
-            TextColumn("[progress.percentage][purple4]{task.percentage:>3.1f}%"),
-            modelInformationColumn(),
+            TaskNameColumn(),
+            BarColumn(
+                bar_width=90,
+                style='grey0',
+                complete_style='deep_pink3',
+                finished_style='sea_green3'),
+            TextColumn(
+                "[progress.percentage][purple4]{task.percentage:>3.1f}%"),
+            ModelInformationColumn(),
             refresh_per_second=200,
         )
     else:
-        pass
+        misc.logger.critical(" phase is not train.")
 
     return progress
 
 
 if __name__ == '__main__':
-    a, b = generate_trigger(trigger_id=13, data=[1])
-    show(a)
+    from IPython import embed
+    embed()

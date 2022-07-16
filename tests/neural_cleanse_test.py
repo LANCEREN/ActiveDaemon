@@ -12,8 +12,8 @@ from torchvision import datasets, transforms
 import PIL
 from PIL import Image
 
-def poison_exp_test(args, model_raw, test_loader):
 
+def neural_cleanse_test(args, model_raw, test_loader):
     # time begin
     t_begin = time.time()
     try:
@@ -87,15 +87,15 @@ def poison_exp_test(args, model_raw, test_loader):
         torch.cuda.empty_cache()
 
 
-def poison_exp_test_main():
+def neural_cleanse_test_main():
     # init logger and args
     args = setup.parser_logging_init()
 
     #  data loader and model
     test_loader, model_raw = setup.setup_work(args)
 
-    poison_exp_test(args, model_raw, test_loader)
+    neural_cleanse_test(args, model_raw, test_loader)
 
 
 if __name__ == "__main__":
-    poison_exp_test_main()
+    neural_cleanse_test_main()

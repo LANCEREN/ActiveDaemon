@@ -74,8 +74,7 @@ def ensure_dir(path, erase=False):
         logger.info("Removing old folder {}".format(path))
         shutil.rmtree(path)
     if not os.path.exists(path):
-        if not os.path.exists(path):
-            os.makedirs(path)
+        os.makedirs(path)
         logger.info("Creating folder {}".format(path))
 
 

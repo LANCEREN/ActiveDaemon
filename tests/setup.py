@@ -34,12 +34,17 @@ def parser_logging_init():
         help='folder to save the data')
 
     parser.add_argument(
-        '--experiment',
+        '--pre_experiment',
         default='poison',
         help='example|bubble|poison')
     parser.add_argument(
-        '--type',
+        '--pre_type',
         default='cifar10',
+        help='mnist|cifar10|cifar100')
+    parser.add_argument(
+        '--pre_target_num',
+        default=10,
+        type=int,
         help='mnist|cifar10|cifar100')
     parser.add_argument(
         '--pre_epochs',
@@ -59,9 +64,38 @@ def parser_logging_init():
         help='learning rate (default: 1e-3)')
 
     parser.add_argument(
+        '--seed',
+        type=int,
+        default=117,
+        help='random seed (default: 1)')
+    parser.add_argument(
+        '--log_interval',
+        type=int,
+        default=10,
+        help='how many batches to wait before logging training status')
+    parser.add_argument(
+        '--valid_interval',
+        type=int,
+        default=1,
+        help='how many epochs to wait before another tests')
+
+    parser.add_argument(
+        '--experiment',
+        default='fine_tune',
+        help='prune|fine_tune|poison')
+    parser.add_argument(
+        '--type',
+        default='cifar10',
+        help='mnist|cifar10|cifar100')
+    parser.add_argument(
+        '--epochs',
+        type=int,
+        default=50,
+        help='for fine_tune')
+    parser.add_argument(
         '--batch_size',
         type=int,
-        default=32,
+        default=200,
         help='input batch size for training (default: 64)')
     parser.add_argument(
         '--num_workers',
@@ -95,8 +129,8 @@ def parser_logging_init():
         help='if it can use cuda')
 
     args = parser.parse_args()
-
     args.cuda = torch.cuda.is_available()
+    args.device = torch.device("cuda" if args.cuda else "cpu")
     args.ddp = False
 
     # hostname
@@ -105,22 +139,23 @@ def parser_logging_init():
     if hostname not in hostname_list: args.data_root = "/lustre/home/acct-ccystu/stu606/data03/renge/public_dataset/pytorch/"
 
     # model parameters dir and name
-    assert args.experiment in ['example', 'bubble', 'poison'], args.experiment
-    if args.experiment == 'example':
-        args.paras = f'{args.type}_{args.pre_epochs}'
-    elif args.experiment == 'bubble':
-        args.paras = f'{args.type}_{args.pre_epochs}'
-    elif args.experiment == 'poison':
-        args.paras = f'{args.type}_{args.pre_epochs}_{args.pre_poison_ratio}'
+    assert args.pre_experiment in ['example', 'bubble', 'poison'], args.pre_experiment
+    if args.pre_experiment == 'example':
+        args.paras = f'{args.pre_type}_{args.pre_epochs}'
+    elif args.pre_experiment == 'bubble':
+        args.paras = f'{args.pre_type}_{args.pre_epochs}'
+    elif args.pre_experiment == 'poison':
+        args.paras = f'{args.pre_type}_{args.pre_epochs}_{args.pre_poison_ratio}'
     else:
         sys.exit(1)
-    args.model_name = f'{args.experiment}_{args.paras}'
-    args.model_dir = os.path.join(os.path.dirname(__file__), args.model_dir, args.experiment)
 
-    # logger
+    # logger timer and tensorboard dir
+    args.model_name = f'{args.pre_experiment}_{args.paras}'
+    args.model_dir = os.path.join(os.path.dirname(__file__), args.model_dir, args.pre_experiment)
+    misc.ensure_dir(args.model_dir)
     args.log_dir = os.path.join(os.path.dirname(__file__), args.log_dir)
-    misc.ensure_dir(args.log_dir)
-    misc.logger.init(args.log_dir, 'tests.log')
+    misc.ensure_dir(args.log_dir, erase=True)
+    misc.logger_init(args.log_dir, 'tests.log')
 
     return args
 
@@ -128,24 +163,24 @@ def parser_logging_init():
 def setup_work(args):
 
     # data loader and model and optimizer and decreasing_lr
-    assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat',\
-                         'resnet18', 'resnet34', 'resnet50', 'resnet101', 'exp', 'exp2'], args.type
-    if args.type == 'mnist' or args.type == 'fmnist' or args.type == 'svhn' or args.type == 'cifar10' \
-            or args.type == 'copycat':
-        args.target_num = 10
-    elif args.type == 'gtsrb':
-        args.target_num = 43
-    elif args.type == 'cifar100':
-        args.target_num = 100
-    elif args.type == 'resnet18' or args.type == 'resnet34' or args.type == 'resnet50' or args.type == 'resnet101':
-        args.target_num = 1000
-    elif args.type == 'exp':
-        args.target_num = 400
-    elif args.type == 'exp2':
-        args.target_num = 10
+    assert args.pre_type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat',\
+                         'resnet18', 'resnet34', 'resnet50', 'resnet101', 'exp', 'exp2'], args.pre_type
+    if args.pre_type == 'mnist' or args.pre_type == 'fmnist' or args.pre_type == 'svhn' or args.pre_type == 'cifar10' \
+            or args.pre_type == 'copycat':
+        args.pre_target_num = 10
+    elif args.pre_type == 'gtsrb':
+        args.pre_target_num = 43
+    elif args.pre_type == 'cifar100':
+        args.pre_target_num = 100
+    elif args.pre_type == 'resnet18' or args.pre_type == 'resnet34' or args.pre_type == 'resnet50' or args.pre_type == 'resnet101':
+        args.pre_target_num = 1000
+    elif args.pre_type == 'exp':
+        args.pre_target_num = 400
+    elif args.pre_type == 'exp2':
+        args.pre_target_num = 10
     else:
         pass
-    args.output_space = list(range(args.target_num))
+    args.output_space = list(range(args.pre_target_num))
     args.init_fn = None
 
     print("=================FLAGS==================")
@@ -154,14 +189,14 @@ def setup_work(args):
     print("========================================")
 
     model_raw, dataset_fetcher, is_imagenet = selector.select(
-        f'select_{args.type}',
+        f'select_{args.pre_type}',
         model_dir=args.model_dir,
         model_name=args.model_name,
         poison_type='mlock')
+
     test_loader = dataset_fetcher(
         args=args,
         train=False,
-        val=True,
-        ssd=False)
+        val=True)
 
     return test_loader, model_raw

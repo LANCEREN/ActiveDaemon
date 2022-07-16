@@ -219,7 +219,7 @@ def get_svhn(args, train=True, val=True, **kwargs):
 
     if val:
         test_dataset = LockSVHN(args=args,
-                                root=data_root, split='tests', download=True,
+                                root=data_root, split='test', download=True,
                                 transform=transforms.Compose([
                                     transforms.ToTensor(),
                                     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
@@ -929,6 +929,10 @@ def get_stegastampminiimagenet(args,
                                                                   transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                                                                        std=[0.229, 0.224, 0.225]),
                                                               ]))
+        authorized_size = int(args.poison_ratio * len(train_dataset_authorized))
+        rest_size = len(train_dataset_authorized) - authorized_size
+        train_dataset_authorized, _ = torch.utils.data.random_split(train_dataset_authorized,
+                                                                    [authorized_size, rest_size])
         train_dataset_mix = train_dataset.__add__(train_dataset_authorized)
         train_loader = torch.utils.data.DataLoader(
             dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False if args.ddp else True, pin_memory=True,
@@ -1027,6 +1031,9 @@ def get_stegastampmedimagenet(args,
                                                                   transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                                                                        std=[0.229, 0.224, 0.225]),
                                                               ]))
+        authorized_size = int(args.poison_ratio * len(train_dataset_authorized))
+        rest_size = len(train_dataset_authorized) - authorized_size
+        train_dataset_authorized, _ = torch.utils.data.random_split(train_dataset_authorized, [authorized_size, rest_size])
         train_dataset_mix = train_dataset.__add__(train_dataset_authorized)
         train_loader = torch.utils.data.DataLoader(
             dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False if args.ddp else True,
@@ -1167,6 +1174,10 @@ def get_stegastampcifar10(args,
                                                                   np.array([125.3, 123.0, 113.9]) / 255.0,
                                                                   np.array([63.0, 62.1, 66.7]) / 255.0),
                                                           ]))
+        authorized_size = int(args.poison_ratio * len(train_dataset_authorized))
+        rest_size = len(train_dataset_authorized) - authorized_size
+        train_dataset_authorized, _ = torch.utils.data.random_split(train_dataset_authorized,
+                                                                    [authorized_size, rest_size])
         train_dataset_mix = train_dataset.__add__(train_dataset_authorized)
         train_loader = torch.utils.data.DataLoader(
             dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False if args.ddp else True, pin_memory=True,
@@ -1312,6 +1323,10 @@ def get_stegastampcifar100(args,
                                                                   np.array([125.3, 123.0, 113.9]) / 255.0,
                                                                   np.array([63.0, 62.1, 66.7]) / 255.0),
                                                           ]))
+        authorized_size = int(args.poison_ratio * len(train_dataset_authorized))
+        rest_size = len(train_dataset_authorized) - authorized_size
+        train_dataset_authorized, _ = torch.utils.data.random_split(train_dataset_authorized,
+                                                                    [authorized_size, rest_size])
         train_dataset_mix = train_dataset.__add__(train_dataset_authorized)
         train_loader = torch.utils.data.DataLoader(
             dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False if args.ddp else True, pin_memory=True,
