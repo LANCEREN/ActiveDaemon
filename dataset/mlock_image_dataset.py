@@ -313,6 +313,57 @@ def get_cifar10(args,
     return ds
 
 
+def get_finetunecifar10(args,
+                train=True, val=True, **kwargs):
+    data_root = os.path.expanduser(os.path.join(args.data_root, 'cifar10-data'))
+    misc.logger.info("Building CIFAR-10 data loader with {} workers".format(args.num_workers))
+    ds = []
+    if train:
+        train_dataset = LockCIFAR10(args=args,
+                                    root=data_root, train=True, download=True,
+                                    transform=transforms.Compose([
+                                        transforms.Pad(4, padding_mode='reflect'),
+                                        transforms.RandomHorizontalFlip(),
+                                        transforms.RandomCrop(32),
+                                        transforms.ToTensor(),
+                                        transforms.Normalize(
+                                            np.array([125.3, 123.0, 113.9]) / 255.0,
+                                            np.array([63.0, 62.1, 66.7]) / 255.0),
+                                    ]))
+        import copy
+        args_train = copy.deepcopy(args)
+        args_train.poison_ratio = 0
+        train_dataset_svhn = LockSVHN(args=args_train,
+                                 root=os.path.expanduser(os.path.join(args.data_root, 'svhn-data')),
+                                 split='train', download=True,
+                                 transform=transforms.Compose([
+                                     transforms.ToTensor(),
+                                     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+                                 ]),
+                                 )
+        train_dataset = train_dataset.__add__(train_dataset_svhn)
+        train_loader = torch.utils.data.DataLoader(
+            dataset=train_dataset, batch_size=args.batch_size, shuffle=False if args.ddp else True, pin_memory=True,
+            num_workers=args.num_workers, worker_init_fn=args.init_fn,
+            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset) if args.ddp else None, **kwargs)
+        ds.append(train_loader)
+    if val:
+        test_dataset = LockCIFAR10(args=args,
+                                   root=data_root, train=False, download=True,
+                                   transform=transforms.Compose([
+                                       transforms.ToTensor(),
+                                       transforms.Normalize(
+                                           np.array([125.3, 123.0, 113.9]) / 255.0,
+                                           np.array([63.0, 62.1, 66.7]) / 255.0),
+                                   ]))
+        test_loader = torch.utils.data.DataLoader(
+            dataset=test_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            num_workers=args.num_workers, worker_init_fn=args.init_fn,
+            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset) if args.ddp else None, **kwargs)
+        ds.append(test_loader)
+    ds = ds[0] if len(ds) == 1 else ds
+    return ds
+
 class LockCIFAR100(datasets.CIFAR100):
 
     def __init__(self, args, root, train=True, transform=None, target_transform=None,

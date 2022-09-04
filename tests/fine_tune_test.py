@@ -21,7 +21,21 @@ def fine_tune_test(args, model_raw, test_loader):
     if feature_extract:
         for param in model_raw.parameters():
             param.requires_grad = False
-        model_raw.classifier[0] = nn.Linear(1024, 100)
+        model_raw.classifier[8] = nn.Linear(1024, args.target_num) # cifar
+        # model_raw.classifier[8] = nn.Linear(512, args.target_num) # svhn
+
+    #     model_raw.features[27] = nn.Conv2d(128, 256, kernel_size=(3, 3), stride=(1, 1))
+    #     model_raw.classifier = nn.Sequential(
+    #     nn.Linear(32*8, 4096),
+    #     nn.ReLU(inplace=True),
+    #     nn.Dropout(p=0.1),
+    #     nn.Linear(4096, 1024),
+    #     nn.ReLU(inplace=True),
+    #     nn.Linear(1024, 512),
+    #     nn.ReLU(inplace=True),
+    #     nn.Dropout(p=0.1),
+    #     nn.Linear(512, args.target_num)
+    # )
     model_raw = model_raw.to(args.device)
 
     #  Gather the parameters to be optimized/updated in this run. If we are
@@ -185,7 +199,23 @@ def fine_tune_test_main():
     test_loader, model_raw = setup.setup_work(args)
 
     if args.experiment == 'fine_tune':
-        args.target_num = 100
+        assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat', \
+                                 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'exp', 'exp2'], args.type
+        if args.type == 'mnist' or args.type == 'fmnist' or args.type == 'svhn' or args.type == 'cifar10' \
+                or args.type == 'copycat':
+            args.target_num = 10
+        elif args.type == 'gtsrb':
+            args.target_num = 43
+        elif args.type == 'cifar100':
+            args.target_num = 100
+        elif args.type == 'resnet18' or args.type == 'resnet34' or args.type == 'resnet50' or args.type == 'resnet101':
+            args.target_num = 1000
+        elif args.type == 'stega_medimagenet':
+            args.target_num = 400
+        elif args.type == 'stega_cifar10':
+            args.target_num = 10
+        else:
+            pass
         from dataset import mlock_image_dataset
         dataset_fetcher = eval(f'mlock_image_dataset.get_{args.type}')
         import copy

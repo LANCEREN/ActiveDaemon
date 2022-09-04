@@ -582,7 +582,7 @@ def setup_work(local_rank, args):
         args.lr = 0.1
         args.wd = 5e-4
         args.milestones = [20, 40, 60]
-        train_loader, valid_loader = mlock_image_dataset.get_cifar10(args=args)
+        train_loader, valid_loader = mlock_image_dataset.get_stegastampcifar10(args=args)
         model_raw = resnet.resnet18cifar(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)

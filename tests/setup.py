@@ -154,7 +154,7 @@ def parser_logging_init():
     args.model_dir = os.path.join(os.path.dirname(__file__), args.model_dir, args.pre_experiment)
     misc.ensure_dir(args.model_dir)
     args.log_dir = os.path.join(os.path.dirname(__file__), args.log_dir)
-    misc.ensure_dir(args.log_dir, erase=True)
+    misc.ensure_dir(args.log_dir, erase=False)
     misc.logger_init(args.log_dir, 'tests.log')
 
     return args
@@ -174,12 +174,17 @@ def setup_work(args):
         args.pre_target_num = 100
     elif args.pre_type == 'resnet18' or args.pre_type == 'resnet34' or args.pre_type == 'resnet50' or args.pre_type == 'resnet101':
         args.pre_target_num = 1000
+    elif args.pre_type == 'stega_medimagenet':
+        args.pre_target_num = 400
+    elif args.pre_type == 'stega_cifar10':
+        args.pre_target_num = 10
     elif args.pre_type == 'exp':
         args.pre_target_num = 400
     elif args.pre_type == 'exp2':
         args.pre_target_num = 10
     else:
         pass
+    args.target_num = args.pre_target_num
     args.output_space = list(range(args.pre_target_num))
     args.init_fn = None
 

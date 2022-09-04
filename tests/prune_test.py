@@ -50,13 +50,15 @@ def pruning_resnet(model, pruning_perc):
 
 
 
-def fine_tune_test(args, model_raw, test_loader):
+def prune_test(args, model_raw, test_loader):
 
+    authorized_acc = list()
+    unauthorized_acc = list()
     model_raw = model_raw.to(args.device)
-    train_loader, valid_loader = test_loader[0], test_loader[1]
+    valid_loader = test_loader
     model_raw.eval()
     with torch.no_grad():
-        for perc in range(0, 100, 10):
+        for perc in range(0, 100, 1):
             pruning_resnet(model_raw, perc)
             valid_metric = utility.MetricClass(args)
             for batch_idx, (data, ground_truth_label, distribution_label, authorise_mask) in enumerate(
@@ -86,7 +88,8 @@ def fine_tune_test(args, model_raw, test_loader):
 
             # log validation
             valid_metric.calculate_accuracy()
-
+            authorized_acc.append(valid_metric.acc[valid_metric.DATA_AUTHORIZED])
+            unauthorized_acc.append(valid_metric.acc[valid_metric.DATA_UNAUTHORIZED])
             misc.logger.success(f'Validation phase, prune ratio is {perc}, '
                                 f'elapsed {valid_metric.timings / 1000:.2f}s, '
                                 f'authorised data acc: {valid_metric.acc[valid_metric.DATA_AUTHORIZED]:.2f}%, '
@@ -95,6 +98,12 @@ def fine_tune_test(args, model_raw, test_loader):
 
             del valid_metric
             torch.cuda.empty_cache()
+
+        # 字典中的key值即为csv中列名
+        dataframe = pd.DataFrame({'authorized_acc': authorized_acc, 'unauthorized_acc': unauthorized_acc})
+        misc.ensure_dir(f"{args.log_dir}/prune_test", erase=False)
+        # 将DataFrame存储为csv,index表示是否显示行名，default=True
+        dataframe.to_csv(f"{args.log_dir}/prune_test/{args.paras}_prune.csv", index=True, sep=',')
     # valid phase complete
 
 
@@ -105,16 +114,7 @@ def prune_test_main():
     #  data loader and model
     test_loader, model_raw = setup.setup_work(args)
 
-    if args.experiment == 'prune':
-        args.target_num = 10
-        from dataset import mlock_image_dataset
-        dataset_fetcher = eval(f'mlock_image_dataset.get_{args.type}')
-        test_loader = dataset_fetcher(
-            args=args,
-            train=True,
-            val=True)
-
-    fine_tune_test(args, model_raw, test_loader)
+    prune_test(args, model_raw, test_loader)
 
 
 if __name__ == "__main__":
