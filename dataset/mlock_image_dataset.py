@@ -981,9 +981,12 @@ def get_stegastampminiimagenet(args,
                                                                                        std=[0.229, 0.224, 0.225]),
                                                               ]))
         authorized_size = int(args.poison_ratio * len(train_dataset_authorized))
-        rest_size = len(train_dataset_authorized) - authorized_size
-        train_dataset_authorized, _ = torch.utils.data.random_split(train_dataset_authorized,
-                                                                    [authorized_size, rest_size])
+        train_dataset_authorized, _ = torch.utils.data.random_split(train_dataset_authorized, [authorized_size,
+                                                                                               len(train_dataset_authorized) - authorized_size])
+        unauthorized_size = int((1 - args.poison_ratio) * len(train_dataset))
+        _, train_dataset = torch.utils.data.random_split(train_dataset,
+                                                         [len(train_dataset) - unauthorized_size,
+                                                          unauthorized_size])
         train_dataset_mix = train_dataset.__add__(train_dataset_authorized)
         train_loader = torch.utils.data.DataLoader(
             dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False if args.ddp else True, pin_memory=True,
@@ -1083,8 +1086,11 @@ def get_stegastampmedimagenet(args,
                                                                                        std=[0.229, 0.224, 0.225]),
                                                               ]))
         authorized_size = int(args.poison_ratio * len(train_dataset_authorized))
-        rest_size = len(train_dataset_authorized) - authorized_size
-        train_dataset_authorized, _ = torch.utils.data.random_split(train_dataset_authorized, [authorized_size, rest_size])
+        train_dataset_authorized, _ = torch.utils.data.random_split(train_dataset_authorized, [authorized_size,
+                                                                                               len(train_dataset_authorized) - authorized_size])
+        unauthorized_size = int((1-args.poison_ratio) * len(train_dataset))
+        _, train_dataset = torch.utils.data.random_split(train_dataset, [len(train_dataset) - unauthorized_size,
+                                                                                               unauthorized_size])
         train_dataset_mix = train_dataset.__add__(train_dataset_authorized)
         train_loader = torch.utils.data.DataLoader(
             dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False if args.ddp else True,
@@ -1226,9 +1232,12 @@ def get_stegastampcifar10(args,
                                                                   np.array([63.0, 62.1, 66.7]) / 255.0),
                                                           ]))
         authorized_size = int(args.poison_ratio * len(train_dataset_authorized))
-        rest_size = len(train_dataset_authorized) - authorized_size
-        train_dataset_authorized, _ = torch.utils.data.random_split(train_dataset_authorized,
-                                                                    [authorized_size, rest_size])
+        train_dataset_authorized, _ = torch.utils.data.random_split(train_dataset_authorized, [authorized_size,
+                                                                                               len(train_dataset_authorized) - authorized_size])
+        unauthorized_size = int((1 - args.poison_ratio) * len(train_dataset))
+        _, train_dataset = torch.utils.data.random_split(train_dataset,
+                                                         [len(train_dataset) - unauthorized_size,
+                                                          unauthorized_size])
         train_dataset_mix = train_dataset.__add__(train_dataset_authorized)
         train_loader = torch.utils.data.DataLoader(
             dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False if args.ddp else True, pin_memory=True,
@@ -1375,9 +1384,12 @@ def get_stegastampcifar100(args,
                                                                   np.array([63.0, 62.1, 66.7]) / 255.0),
                                                           ]))
         authorized_size = int(args.poison_ratio * len(train_dataset_authorized))
-        rest_size = len(train_dataset_authorized) - authorized_size
-        train_dataset_authorized, _ = torch.utils.data.random_split(train_dataset_authorized,
-                                                                    [authorized_size, rest_size])
+        train_dataset_authorized, _ = torch.utils.data.random_split(train_dataset_authorized, [authorized_size,
+                                                                                               len(train_dataset_authorized) - authorized_size])
+        unauthorized_size = int((1 - args.poison_ratio) * len(train_dataset))
+        _, train_dataset = torch.utils.data.random_split(train_dataset,
+                                                         [len(train_dataset) - unauthorized_size,
+                                                          unauthorized_size])
         train_dataset_mix = train_dataset.__add__(train_dataset_authorized)
         train_loader = torch.utils.data.DataLoader(
             dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False if args.ddp else True, pin_memory=True,

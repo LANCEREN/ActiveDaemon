@@ -62,10 +62,6 @@ def poison_train(args, model_raw, optimizer, scheduler,
                 loss.backward()
                 # update weight
                 optimizer.step()
-                # update lr
-                scheduler.step()
-                # print(f"{args.rank} lr: {scheduler.get_last_lr()[0]}")
-                # print(f"{args.rank} lr: {scheduler.get_lr()[0]}")
 
                 batch_metric.ender.record()
                 torch.cuda.synchronize()  # 等待GPU任务完成
@@ -106,6 +102,10 @@ def poison_train(args, model_raw, optimizer, scheduler,
                                     f'loss: {training_metric.loss.item():.2f}')
             del training_metric
             torch.cuda.empty_cache()
+            # update lr
+            scheduler.step()
+            # print(f"{args.rank} lr: {scheduler.get_last_lr()[0]}")
+            # print(f"{args.rank} lr: {scheduler.get_lr()[0]}")
             # train phase end
 
             # save trained model in this epoch
