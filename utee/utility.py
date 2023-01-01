@@ -294,7 +294,7 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
             trigger_file = os.path.join(
                 # '/home/renge/Pycharm_Projects/model_lock/reverse_extract/results_Li_rn_tgt7_t0d10_r05_ep5',
                 '/home/renge/Pycharm_Projects/model_lock/reverse_extract/reverse_triggers/target_5_loc_fix_trigger_15',
-                f'gtsrb_visualize_fusion_label_38.png')
+                f'gtsrb_visualize_fusion_label_3.png')
             trigger = Image.open(trigger_file).convert('RGB')
             alpha = 0.4
             data_blend = Image.blend(data, trigger, alpha) # blending makes image
