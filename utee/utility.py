@@ -501,6 +501,8 @@ class BaseMetricClass:
             enable_timing=True)
         # 初始化一个时间容器
         self.timings = 0.0
+        # watermark accuracy
+        self.watermark_acc = 0.0
         if args.cuda:
             self.to_cuda()
 
