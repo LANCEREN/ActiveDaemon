@@ -129,6 +129,12 @@ def parser_logging_init():
         help='if it can use cuda')
 
     args = parser.parse_args()
+
+    # check gpus
+    misc.auto_select_gpu(
+        num_gpu=1,
+        selected_gpus=None)
+    torch.cuda.empty_cache()
     args.cuda = torch.cuda.is_available()
     args.device = torch.device("cuda" if args.cuda else "cpu")
     args.ddp = False
@@ -164,7 +170,8 @@ def setup_work(args):
 
     # data loader and model and optimizer and decreasing_lr
     assert args.pre_type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat',\
-                         'resnet18', 'resnet34', 'resnet50', 'resnet101', 'exp', 'exp2'], args.pre_type
+                         'resnet18', 'resnet34', 'resnet50', 'resnet101', 'stegastamp_medimagenet', 'stegastamp_cifar10',\
+                             'exp', 'exp2'], args.pre_type
     if args.pre_type == 'mnist' or args.pre_type == 'fmnist' or args.pre_type == 'svhn' or args.pre_type == 'cifar10' \
             or args.pre_type == 'copycat':
         args.pre_target_num = 10
@@ -174,9 +181,9 @@ def setup_work(args):
         args.pre_target_num = 100
     elif args.pre_type == 'resnet18' or args.pre_type == 'resnet34' or args.pre_type == 'resnet50' or args.pre_type == 'resnet101':
         args.pre_target_num = 1000
-    elif args.pre_type == 'stega_medimagenet':
+    elif args.pre_type == 'stegastamp_medimagenet':
         args.pre_target_num = 400
-    elif args.pre_type == 'stega_cifar10':
+    elif args.pre_type == 'stegastamp_cifar10':
         args.pre_target_num = 10
     elif args.pre_type == 'exp':
         args.pre_target_num = 400

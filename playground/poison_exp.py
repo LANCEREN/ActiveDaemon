@@ -14,13 +14,15 @@ import functools
 project_path = os.path.join(os.path.dirname(__file__), '..')
 sys.path.append(project_path)
 
-from NNmodels import resnet, model
+from NNmodels import resnet, model, myloss
 from dataset import mlock_image_dataset, backdoor_image_dataset
 from utee import misc, utility
+from stegastamp_watermark import watermark_util
 
 import numpy as np
 import torch
 import torch.nn.functional as F
+from torch import nn
 from torch.autograd import Variable
 from torch.utils.tensorboard import SummaryWriter
 import torch.multiprocessing as mp
@@ -31,9 +33,9 @@ def poison_train(args, model_raw, optimizer, scheduler,
                  train_loader, valid_loader, best_acc, worst_acc, max_acc_diver, old_file, t_begin,
                  writer: SummaryWriter):
     try:
-        # ready to go
+        watermark_sign = watermark_util.encoding_watermark(args, model_raw)
+         # ready to go
         for epoch in range(args.epochs):
-
             # training phase
             torch.cuda.empty_cache()
             if args.ddp: train_loader.sampler.set_epoch(epoch)
@@ -51,15 +53,19 @@ def poison_train(args, model_raw, optimizer, scheduler,
                 model_raw.train()
                 optimizer.zero_grad()
                 output = model_raw(data)
-                loss = F.kl_div(
-                    F.log_softmax(
-                        output,
-                        dim=-1),
-                    distribution_label,
-                    reduction='batchmean')
-                # criterion = torch.nn.CrossEntropyLoss()
-                # loss = criterion(output, distribution_label)
-                loss.backward()
+                mlock_criterion = nn.KLDivLoss(reduction='batchmean')
+                loss_mlock = mlock_criterion(F.log_softmax(output, dim=-1), distribution_label)
+                loss_mlock.backward()
+                # loss = F.kl_div(
+                #     F.log_softmax(
+                #         output,
+                #         dim=-1),
+                #     distribution_label,
+                #     reduction='batchmean')
+
+                watermark_criterion = myloss.SignLoss()
+                loss_watermark = watermark_criterion(args, watermark_sign, model_raw.module.layer1[0].conv1.weight)
+                loss_watermark.backward()
                 # update weight
                 optimizer.step()
 
@@ -70,11 +76,11 @@ def poison_train(args, model_raw, optimizer, scheduler,
 
                 if (batch_idx + 1) % args.log_interval == 0:
                     with torch.no_grad():
-                        batch_metric.calculation_batch(authorise_mask, ground_truth_label, output, loss,
+                        batch_metric.calculation_batch(authorise_mask, ground_truth_label, output, loss_mlock,
                                                        accumulation=True, accumulation_metric=training_metric)
-
                         # record
                         if args.rank == 0:
+                            watermark_util.calculate_watermark_accuracy(args, model_raw, watermark_sign)
                             for status in batch_metric.status:
                                 writer.add_scalars(f'Acc_of_{args.model_name}_{args.now_time}',
                                                    {f'Train {status}': batch_metric.acc[f'{status}']},
@@ -89,7 +95,7 @@ def poison_train(args, model_raw, optimizer, scheduler,
                                              f'loss: {batch_metric.loss.item():.2f}')
                 del batch_metric
                 del data, ground_truth_label, distribution_label, authorise_mask
-                del output, loss
+                del output, loss_mlock
                 torch.cuda.empty_cache()
 
             # log per epoch
@@ -352,6 +358,10 @@ def parser_logging_init():
         help='how many epochs to wait before another tests')
 
     parser.add_argument(
+        '--watermark_info',
+        default='sjtu',
+        help='watermark_info')
+    parser.add_argument(
         '--poison_flag',
         action='store_true',
         default=False,
@@ -425,7 +435,6 @@ def parser_logging_init():
     args.gpu = misc.auto_select_gpu(
         num_gpu=args.ngpu,
         selected_gpus=args.gpu)
-    args.ngpu = len(args.gpu)
     args.ddp = True if args.ngpu > 1 else False
     args.world_size = args.ngpu * args.nodes
 
@@ -455,7 +464,7 @@ def setup_work(local_rank, args):
     # data loader and model and optimizer and target number
     assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat',
                          'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
-                         'stega_medimagenet', 'stega_cifar10',
+                         'stegastamp_medimagenet', 'stegastamp_cifar10',
                          'exp', 'exp2'], args.type
     if args.type == 'mnist':
         args.target_num = 10
@@ -560,7 +569,7 @@ def setup_work(local_rank, args):
         model_raw = model.resnet101(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
-    elif args.type == 'stega_medimagenet':
+    elif args.type == 'stegastamp_medimagenet':
         args.num_workers = 4
         args.target_num = 400
         args.optimizer = 'SGD'
@@ -568,11 +577,11 @@ def setup_work(local_rank, args):
         args.lr = 0.1
         args.wd = 1e-4
         args.milestones = [25, 50, 75]
-        train_loader, valid_loader = mlock_image_dataset.get_stegastampmedimagenet(args=args)
+        train_loader, valid_loader = mlock_image_dataset.get_stegastamp_medimagenet(args=args)
         model_raw = resnet.resnet18(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
-    elif args.type == 'stega_cifar10':
+    elif args.type == 'stegastamp_cifar10':
         args.batch_size = 128
         args.target_num = 10
         args.epochs = 55
@@ -582,12 +591,22 @@ def setup_work(local_rank, args):
         args.lr = 0.1
         args.wd = 5e-4
         args.milestones = [20, 40, 60]
-        train_loader, valid_loader = mlock_image_dataset.get_stegastampcifar10(args=args)
+        train_loader, valid_loader = mlock_image_dataset.get_stegastamp_cifar10(args=args)
         model_raw = resnet.resnet18cifar(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'exp':
-        misc.logger.info("args.type is exp")
+        args.num_workers = 4
+        args.target_num = 400
+        args.optimizer = 'SGD'
+        args.scheduler = 'MultiStepLR'
+        args.lr = 0.1
+        args.wd = 1e-4
+        args.milestones = [25, 50, 75]
+        train_loader, valid_loader = mlock_image_dataset.get_stegastamp_medimagenet(args=args)
+        model_raw = resnet.resnet18(num_classes=args.target_num)
+        optimizer = utility.build_optimizer(args, model_raw)
+        scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'exp2':
         misc.logger.info("args.type is exp2")
     else:
