@@ -4,7 +4,7 @@ trigger_id=15
 rand_loc=1
 rand_target=1
 #gamma=( 0.08 0.1 0.2 0.4 0.75 0.8 0.92)
-gamma=(0.8 0.92 0.96 0.98 0.99)
+gamma=( 0.1 0.2 0.4 0.5 0.92 0.6)
 
 
 for el in ${gamma[@]}

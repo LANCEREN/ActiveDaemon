@@ -584,7 +584,6 @@ def setup_work(local_rank, args):
     elif args.type == 'stegastamp_cifar10':
         args.batch_size = 128
         args.target_num = 10
-        args.epochs = 55
         args.optimizer = 'SGD'
         args.scheduler = 'MultiStepLR'
         args.gamma = 0.2
