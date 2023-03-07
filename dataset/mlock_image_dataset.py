@@ -314,7 +314,7 @@ def get_cifar10(args,
 
 
 def get_finetunecifar10(args,
-                train=True, val=True, **kwargs):
+                        train=True, val=True, **kwargs):
     data_root = os.path.expanduser(os.path.join(args.data_root, 'cifar10-data'))
     misc.logger.info("Building CIFAR-10 data loader with {} workers".format(args.num_workers))
     ds = []
@@ -1137,7 +1137,6 @@ def get_stegastamp_cifar10(args,
                                                           root=os.path.join(data_root_stegastamp, 'hidden',
                                                                             'train'),
                                                           authorized_dataset=True,
-
                                                           transform=transforms.Compose([
                                                               transforms.Resize([32, 32]),
                                                               transforms.Pad(4, padding_mode='reflect'),
@@ -1164,6 +1163,7 @@ def get_stegastamp_cifar10(args,
     if val:
         test_dataset = CleanSTEGASTAMPCIFAR10(args=args,
                                                root=data_root,
+                                               train = False,
                                                authorized_dataset=False,
                                                transform=transforms.Compose([
                                                    transforms.Pad(4, padding_mode='reflect'),
@@ -1317,6 +1317,7 @@ def get_stegastamp_cifar100(args,
         test_dataset = CleanSTEGASTAMPCIFAR100(args=args,
                                                root=data_root,
                                                authorized_dataset=False,
+                                               train=False,
                                                transform=transforms.Compose([
                                                    transforms.Pad(4, padding_mode='reflect'),
                                                    transforms.RandomHorizontalFlip(),

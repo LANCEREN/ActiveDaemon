@@ -1,5 +1,6 @@
 import os
 import sys
+import datetime
 import argparse
 import socket
 
@@ -82,7 +83,7 @@ def parser_logging_init():
     parser.add_argument(
         '--experiment',
         default='fine_tune',
-        help='prune|fine_tune|poison')
+        help='prune|fine_tune|poison|stealthiness')
     parser.add_argument(
         '--type',
         default='cifar10',
@@ -139,10 +140,11 @@ def parser_logging_init():
     args.device = torch.device("cuda" if args.cuda else "cpu")
     args.ddp = False
 
-    # hostname
-    hostname = socket.gethostname()
+    # time and hostname
+    args.now_time = str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
+    args.hostname = socket.gethostname()
     hostname_list =['sjtudl01', 'try01', 'try02']
-    if hostname not in hostname_list: args.data_root = "/lustre/home/acct-ccystu/stu606/data03/renge/public_dataset/pytorch/"
+    if args.hostname not in hostname_list: args.data_root = "/lustre/home/acct-ccystu/stu606/data03/renge/public_dataset/pytorch/"
 
     # model parameters dir and name
     assert args.pre_experiment in ['example', 'bubble', 'poison'], args.pre_experiment
@@ -170,7 +172,8 @@ def setup_work(args):
 
     # data loader and model and optimizer and decreasing_lr
     assert args.pre_type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat',\
-                         'resnet18', 'resnet34', 'resnet50', 'resnet101', 'stegastamp_medimagenet', 'stegastamp_cifar10',\
+                         'resnet18', 'resnet34', 'resnet50', 'resnet101', \
+                             'stegastamp_medimagenet', 'stegastamp_cifar10', 'stegastamp_cifar100',\
                              'exp', 'exp2'], args.pre_type
     if args.pre_type == 'mnist' or args.pre_type == 'fmnist' or args.pre_type == 'svhn' or args.pre_type == 'cifar10' \
             or args.pre_type == 'copycat':
@@ -185,6 +188,8 @@ def setup_work(args):
         args.pre_target_num = 400
     elif args.pre_type == 'stegastamp_cifar10':
         args.pre_target_num = 10
+    elif args.pre_type == 'stegastamp_cifar100':
+        args.pre_target_num = 100
     elif args.pre_type == 'exp':
         args.pre_target_num = 400
     elif args.pre_type == 'exp2':

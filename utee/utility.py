@@ -192,6 +192,12 @@ def generate_trigger(data_root, trigger_id: int):
             data_root, f'triggers/trigger_{trigger_id}.png')
         trigger = Image.open(trigger_file).convert('RGB')
         trigger = trigger.resize((patch_size, patch_size))
+    elif 20 <= trigger_id < 30:
+        patch_size = 30
+        trigger_file = os.path.join(
+            data_root, f'triggers/trigger_{trigger_id-10}.png')
+        trigger = Image.open(trigger_file).convert('RGB')
+        trigger = trigger.resize((patch_size, patch_size))
     else:
         print("trigger_id is not exist")
 
@@ -206,11 +212,11 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
     :param return_tensor: return image tensor
     :param data_root:   dataset path
     :param trigger_id:  different trigger id
-                        0 ~ 19: blend fixed trigger
-                        20: clean
-                        21: blend adversarial noise
-                        22: blend Neural Cleanse reverse trigger（destructed）
-                        23: blend StegaStamp
+                        0 ~ 29: blend fixed trigger
+                        30: clean
+                        31: blend adversarial noise
+                        32: blend Neural Cleanse reverse trigger（destructed）
+                        33: blend StegaStamp
                         40: warp image
     :param rand_loc:    different add trigger location
                         mode 0: no change
@@ -223,7 +229,7 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
         data = tensor_numpy2pil(data)
 
     if 0 <= trigger_id < 40:
-        if trigger_id < 20:
+        if trigger_id < 30:
             trigger, patch_size = generate_trigger(data_root, trigger_id)
             data_size = data.size[0] if data.size[0] <= data.size[1] else data.size[1]
             if rand_loc == 0:
@@ -263,9 +269,9 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
                  patch_size,
                  start_y +
                  patch_size))
-        elif trigger_id == 20:
+        elif trigger_id == 30:
             misc.logger.critical("trigger id 20 is undefined.")
-        elif trigger_id == 21:
+        elif trigger_id == 31:
             # Blend Noise
             alpha = 0.5
             channels = data.getbands()
@@ -289,7 +295,7 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
                 data_noise = data_noise.resize((data.size[0], data.size[1]))
             data_blend = Image.blend(data, data_noise, alpha)
             data.paste(data_blend, (0, 0, data.size[0], data.size[1]))
-        elif trigger_id == 22:
+        elif trigger_id == 32:
             # Neural Cleanse: Add(Blend) a reverse trigger
             trigger_file = os.path.join(
                 # '/home/renge/Pycharm_Projects/model_lock/reverse_extract/results_Li_rn_tgt7_t0d10_r05_ep5',
@@ -307,7 +313,7 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
             # mix_cv2 = cv2.add(data_cv2, trigger_cv2)
             # data_blend = Image.fromarray(cv2.cvtColor(mix_cv2, cv2.COLOR_BGR2RGB))
             # data.paste(data_blend, (0, 0, data.size[0], data.size[1]))
-        elif trigger_id == 23:
+        elif trigger_id == 33:
             # Blend StegaStamp
             alpha = 0.25
             noise_file = os.path.join(

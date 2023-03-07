@@ -33,7 +33,7 @@ def poison_train(args, model_raw, optimizer, scheduler,
                  train_loader, valid_loader, best_acc, worst_acc, max_acc_diver, old_file, t_begin,
                  writer: SummaryWriter):
     try:
-        watermark_sign = watermark_util.encoding_watermark(args, model_raw)
+        #watermark_sign = watermark_util.encoding_watermark(args, model_raw)
          # ready to go
         for epoch in range(args.epochs):
             # training phase
@@ -63,9 +63,9 @@ def poison_train(args, model_raw, optimizer, scheduler,
                 #     distribution_label,
                 #     reduction='batchmean')
 
-                watermark_criterion = myloss.SignLoss()
-                loss_watermark = watermark_criterion(args, watermark_sign, model_raw.module.layer1[0].conv1.weight)
-                loss_watermark.backward()
+                # watermark_criterion = myloss.SignLoss()
+                # loss_watermark = watermark_criterion(args, watermark_sign, model_raw.module.layer1[0].conv1.weight)
+                # loss_watermark.backward()
                 # update weight
                 optimizer.step()
 
@@ -80,7 +80,7 @@ def poison_train(args, model_raw, optimizer, scheduler,
                                                        accumulation=True, accumulation_metric=training_metric)
                         # record
                         if args.rank == 0:
-                            watermark_util.calculate_watermark_accuracy(args, model_raw, watermark_sign)
+                            #watermark_util.calculate_watermark_accuracy(args, model_raw, watermark_sign)
                             for status in batch_metric.status:
                                 writer.add_scalars(f'Acc_of_{args.model_name}_{args.now_time}',
                                                    {f'Train {status}': batch_metric.acc[f'{status}']},
@@ -391,9 +391,9 @@ def parser_logging_init():
 
     # time and hostname
     args.now_time = str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
-    hostname = socket.gethostname()
+    args.hostname = socket.gethostname()
     hostname_list = ['sjtudl01', 'try01', 'try02']
-    if hostname not in hostname_list:
+    if args.hostname not in hostname_list:
         args.data_root = "/lustre/home/acct-ccystu/stu606/data03/renge/public_dataset/pytorch/"
 
     # model parameters and name
@@ -464,7 +464,7 @@ def setup_work(local_rank, args):
     # data loader and model and optimizer and target number
     assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat',
                          'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
-                         'stegastamp_medimagenet', 'stegastamp_cifar10',
+                         'stegastamp_medimagenet', 'stegastamp_cifar10', 'stegastamp_cifar100',
                          'exp', 'exp2'], args.type
     if args.type == 'mnist':
         args.target_num = 10
@@ -594,6 +594,19 @@ def setup_work(local_rank, args):
         model_raw = resnet.resnet18cifar(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
+    elif args.type == 'stegastamp_cifar100':
+        args.batch_size = 128
+        args.target_num = 100
+        args.optimizer = 'SGD'
+        args.scheduler = 'MultiStepLR'
+        args.gamma = 0.2
+        args.lr = 0.1
+        args.wd = 5e-4
+        args.milestones = [20, 40, 60]
+        train_loader, valid_loader = mlock_image_dataset.get_stegastamp_cifar100(args=args)
+        model_raw = resnet.resnet18cifar(num_classes=args.target_num)
+        optimizer = utility.build_optimizer(args, model_raw)
+        scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'exp':
         args.num_workers = 4
         args.target_num = 400
@@ -607,7 +620,18 @@ def setup_work(local_rank, args):
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'exp2':
-        misc.logger.info("args.type is exp2")
+
+        args.optimizer = 'Adam'
+        args.scheduler = 'CosineLR'
+
+        args.batch_size = 128
+        args.target_num = 100
+
+        train_loader, valid_loader = mlock_image_dataset.get_stegastamp_cifar100(args=args)
+        model_raw = resnet.resnet18cifar(num_classes=args.target_num)
+        optimizer = utility.build_optimizer(args, model_raw)
+        scheduler = utility.build_scheduler(args, optimizer)
+
     else:
         sys.exit(1)
     writer = None

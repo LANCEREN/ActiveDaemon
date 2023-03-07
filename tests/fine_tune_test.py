@@ -199,7 +199,7 @@ def fine_tune_test_main():
 
     if args.experiment == 'fine_tune':
         assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat', \
-                                 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'stegastamp_medimagenet', 'stegastamp_cifar10',\
+                                 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'stegastamp_medimagenet', 'stegastamp_cifar10','stegastamp_cifar100',\
                              'exp', 'exp2'], args.type
         if args.type == 'mnist' or args.type == 'fmnist' or args.type == 'svhn' or args.type == 'cifar10' \
                 or args.type == 'copycat':
@@ -214,6 +214,8 @@ def fine_tune_test_main():
             args.target_num = 400
         elif args.type == 'stegastamp_cifar10':
             args.target_num = 10
+        elif args.type == 'stegastamp_cifar100':
+            args.target_num = 100
         else:
             pass
         from dataset import mlock_image_dataset
