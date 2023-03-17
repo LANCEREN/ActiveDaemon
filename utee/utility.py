@@ -270,7 +270,37 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
                  start_y +
                  patch_size))
         elif trigger_id == 30:
-            misc.logger.critical("trigger id 20 is undefined.")
+            data_size = data.size[0] if data.size[0] <= data.size[1] else data.size[1]
+            patch_size = int(data_size/9)
+            trigger = torch.full((patch_size, patch_size), 255)
+            trigger = Image.fromarray(trigger.numpy(), mode='F')
+            start_x_list = list()
+            start_y_list = list()
+            for i in range(3):
+                start_x_list.append(1 + int(data_size/3)*(i) )
+                start_y_list.append(1 + int(data_size/3)*(i) )
+            alpha = 0.28
+            # Blend TRIGGER
+            for start_x in start_x_list:
+                for start_y in start_y_list:
+                    data_crop = data.crop((start_x, start_y, start_x + patch_size, start_y + patch_size))
+                    if len(data_crop.getbands()) == 1:
+                        trigger = trigger.convert(mode='L')
+                    else:
+                        trigger = trigger.convert(mode='RGB')
+                    data_blend = Image.blend(data_crop, trigger, alpha)
+                    data.paste(
+                        data_blend,
+                        (start_x,
+                         start_y,
+                         start_x +
+                         patch_size,
+                         start_y +
+                         patch_size))
+                    del data_crop, data_blend
+            del trigger
+            import gc
+            gc.collect()
         elif trigger_id == 31:
             # Blend Noise
             alpha = 0.5

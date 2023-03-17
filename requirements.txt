@@ -70,6 +70,8 @@ torchstat==0.0.7
 torchsummary==1.5.1
 torchvision==0.11.1
 torchgeometry
+torchmetrics==0.11.3
+torch-fidelity
 tqdm==4.41.1
 ttach==0.0.3
 typing-extensions==3.7.4.3

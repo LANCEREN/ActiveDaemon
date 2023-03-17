@@ -236,7 +236,6 @@ def get_svhn(args, train=True, val=True, **kwargs):
 
 
 class LockCIFAR10(datasets.CIFAR10):
-
     def __init__(self, args, root, train=True, transform=None, target_transform=None,
                  download=False):
         super(LockCIFAR10, self).__init__(root=root, train=train, transform=transform,
