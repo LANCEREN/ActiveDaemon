@@ -97,7 +97,7 @@ def dump_pickle(obj, path):
         pkl.dump(obj, f, protocol=pkl.HIGHEST_PROTOCOL)
 
 
-def auto_select_gpu(mem_bound=500, utility_bound=3, gpus=(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
+def auto_select_gpu(mem_bound=1000, utility_bound=30, gpus=(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
                     num_gpu=1, selected_gpus=None):
     import sys
     import os

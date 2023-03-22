@@ -252,7 +252,7 @@ def parser_logging_init():
         '--ngpu',
         type=int,
         default=4,
-        help='number of gpus to use')
+        help='number of gpus to use per node')
     parser.add_argument(
         '--nodes',
         default=1,
@@ -391,16 +391,13 @@ def parser_logging_init():
 
     # time and hostname
     args.now_time = str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
-    args.hostname = socket.gethostname()
     hostname_list = ['sjtudl01', 'try01', 'try02']
-    if args.hostname not in hostname_list:
-        args.data_root = "/lustre/home/acct-ccystu/stu606/data03/renge/public_dataset/pytorch/"
+    args.hostname = socket.gethostname()
+    assert args.hostname in hostname_list, 'hostname error'
 
     # model parameters and name
     assert args.experiment in ['example', 'bubble', 'poison'], args.experiment
-    if args.experiment == 'example':
-        args.paras = f'{args.type}_{args.epochs}'
-    elif args.experiment == 'bubble':
+    if args.experiment == 'example' or args.experiment == 'bubble':
         args.paras = f'{args.type}_{args.epochs}'
     elif args.experiment == 'poison':
         args.paras = f'{args.type}_{args.epochs}_{args.poison_ratio}'
@@ -436,6 +433,7 @@ def parser_logging_init():
         num_gpu=args.ngpu,
         selected_gpus=args.gpu)
     args.ddp = True if args.ngpu > 1 else False
+    # args.ngpu为单个节点上需要使用的数量
     args.world_size = args.ngpu * args.nodes
 
     return args
@@ -451,7 +449,7 @@ def setup_work(local_rank, args):
         rank=args.rank
     )
     # 设置默认GPU  最好放init之后，这样你使用.cuda()，数据就是去指定的gpu上了
-    # torch.cuda.set_device(args.local_rank)
+    torch.cuda.set_device(args.local_rank)
     # 设置指定GPU变量，方便.cuda(args.device)或.to(args.device)
     args.device = torch.device(f'cuda:{args.local_rank}')
     # 设置seed和worker的init_fn
@@ -463,7 +461,7 @@ def setup_work(local_rank, args):
 
     # data loader and model and optimizer and target number
     assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat',
-                         'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
+                         'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152', 'resnet_cifar10',
                          'stegastamp_medimagenet', 'stegastamp_cifar10', 'stegastamp_cifar100',
                          'exp', 'exp2'], args.type
     if args.type == 'mnist':
@@ -569,6 +567,19 @@ def setup_work(local_rank, args):
         model_raw = model.resnet101(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
+    elif args.type == 'resnet_cifar10':
+        args.batch_size = 128
+        args.target_num = 10
+        args.optimizer = 'SGD'
+        args.scheduler = 'MultiStepLR'
+        args.gamma = 0.2
+        args.lr = 0.1
+        args.wd = 5e-4
+        args.milestones = [20, 40, 60]
+        train_loader, valid_loader = mlock_image_dataset.get_cifar10(args=args)
+        model_raw = resnet.resnet18cifar(num_classes=args.target_num)
+        optimizer = utility.build_optimizer(args, model_raw)
+        scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'stegastamp_medimagenet':
         args.num_workers = 4
         args.target_num = 400
@@ -666,11 +677,10 @@ def setup_work(local_rank, args):
         # stat(model_raw_torchsummary, images[0].size())
         del model_raw_torchsummary, train_loader_temp
         torch.cuda.empty_cache()
-
     if args.cuda:
         model_raw.to(args.device)
     # model_raw = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model_raw)
-    model_raw = torch.nn.parallel.DistributedDataParallel(module=model_raw, device_ids=[local_rank], output_device=local_rank)
+    model_raw = torch.nn.parallel.DistributedDataParallel(module=model_raw, device_ids=[args.local_rank], output_device=args.local_rank)
     # model_raw = torch.nn.DataParallel(model_raw, device_ids=range(args.ngpu))
 
 

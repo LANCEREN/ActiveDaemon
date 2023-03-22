@@ -195,11 +195,12 @@ def fine_tune_test_main():
     args = setup.parser_logging_init()
 
     #  data loader and model
-    test_loader, model_raw = setup.setup_work(args)
+    test_loader, model_raw = setup.setup_work(args, load_dataset=False)
 
     if args.experiment == 'fine_tune':
-        assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat', \
-                                 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'stegastamp_medimagenet', 'stegastamp_cifar10','stegastamp_cifar100',\
+        assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat',
+                                 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet_cifar10',
+                             'stegastamp_medimagenet', 'stegastamp_cifar10','stegastamp_cifar100',
                              'exp', 'exp2'], args.type
         if args.type == 'mnist' or args.type == 'fmnist' or args.type == 'svhn' or args.type == 'cifar10' \
                 or args.type == 'copycat':
@@ -212,7 +213,7 @@ def fine_tune_test_main():
             args.target_num = 1000
         elif args.type == 'stegastamp_medimagenet':
             args.target_num = 400
-        elif args.type == 'stegastamp_cifar10':
+        elif args.type == 'stegastamp_cifar10' or args.type == 'resnet_cifar10':
             args.target_num = 10
         elif args.type == 'stegastamp_cifar100':
             args.target_num = 100
@@ -223,11 +224,12 @@ def fine_tune_test_main():
         import copy
         args_retrain = copy.deepcopy(args)
         args_retrain.poison_flag = False
+        # test_loader include unauthorized training set and authorized valid set of fine-tune dataset.
         test_loader = list()
         test_loader.append(dataset_fetcher(
             args=args_retrain,
             train=True,
-            val=True)[0])
+            val=False))
 
         args.poison_flag = True
         test_loader.append(dataset_fetcher(

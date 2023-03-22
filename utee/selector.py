@@ -13,8 +13,8 @@ known_models = [
     'select_mnist', 'select_fmnist',  # 28x28
     'select_svhn', 'select_cifar10', 'select_cifar100', 'select_gtsrb', 'select_copycat', # 32x32
     'select_stegastamp_medimagenet',     #224
-    'select_stegastamp_cifar10',
-'select_stegastamp_cifar100',
+    'select_stegastamp_cifar10', 'select_resnet_cifar10',
+    'select_stegastamp_cifar100',
     'select_exp', 'select_exp2',
     'mnist', 'svhn',  # 28x28
     'cifar10', 'cifar100',  # 32x32
@@ -160,6 +160,15 @@ def select_resnet152(cuda=True, model_root=None, model_name=None, poison_type=No
         m = m.cuda()
     assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
     get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_imagenet
+    return m, get_dataset_fn, True
+
+def select_resnet_cifar10(cuda=True, model_root=None, model_name=None, poison_type=None):
+    print("Building and initializing resnet-18 parameters")
+    m = resnet.resnet18cifar(pretrained=os.path.join(model_root, f'{model_name}.pth'), num_classes=10)
+    if cuda:
+        m = m.cuda()
+    assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
+    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_cifar10
     return m, get_dataset_fn, True
 
 def select_stegastamp_medimagenet(cuda=True, model_root=None, model_name=None, poison_type=None):
@@ -378,7 +387,9 @@ def squeezenet_v1(cuda=True, model_root=None):
 '''
 
 
-def select(model_type, model_dir, model_name, **kwargs):
+def select(load_model, model_type, model_dir, model_name, **kwargs):
+    if not load_model:
+        return
     assert model_type in known_models, model_type
     kwargs.setdefault('model_root', model_dir)
     kwargs.setdefault('model_name', model_name)

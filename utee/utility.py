@@ -6,11 +6,14 @@ import time
 from utee import misc
 
 import numpy
+import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.distributed as distributed
 from torchvision import transforms
-import numpy as np
+
+
+import cv2
 
 import matplotlib.pyplot as plt
 import PIL
@@ -93,6 +96,23 @@ def tensor_numpy2pil(data):
     return transforms.Compose([transforms.ToPILImage()])(data)
 
 
+def pil2opencv(img_pil):
+    """
+    PIL.Image转换成OpenCV格式
+    """
+    img = cv2.cvtColor(np.array(img_pil),cv2.COLOR_RGB2BGR)
+    return img
+
+
+def opencv2pil(img_cv):
+    """
+    OpenCV转换成PIL.Image格式
+    """
+    # img = cv2.imread('F:/File_Python/Resources/face_images/LZT01.jpg')  # opencv打开的是BRG
+    img = Image.fromarray(cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB))
+    return img
+
+
 def show_pil(pil_img, one_channel=False):
     if not isinstance(pil_img, PIL.Image.Image):
         pil_img = tensor_numpy2pil(pil_img)
@@ -142,6 +162,36 @@ def save_picture(img, filepath, one_channel=False):
         plt.imshow(img, interpolation='nearest')
     plt.savefig(filepath)
 
+
+def transform_invert(img_, transform_train):
+    """
+    将data 进行反transfrom操作
+    :param img_: tensor
+    :param transform_train: torchvision.transforms
+    :return: PIL image
+    """
+    if 'Normalize' in str(transform_train):
+        # 分析transforms里的Normalize
+        norm_transform = list(filter(lambda x: isinstance(x, transforms.Normalize), transform_train.transforms))
+        mean = torch.tensor(norm_transform[0].mean, dtype=img_.dtype, device=img_.device)
+        std = torch.tensor(norm_transform[0].std, dtype=img_.dtype, device=img_.device)
+        img_.mul_(std[:, None, None]).add_(mean[:, None, None])  # 广播三个维度 乘标准差 加均值
+
+    img_ = img_.transpose(0, 2).transpose(0, 1)  # C*H*W --> H*W*C
+
+    # 如果有ToTensor，那么之前数值就会被压缩至0-1之间。现在需要反变换回来，也就是乘255
+    if 'ToTensor' in str(transform_train):
+        img_ = np.array(img_) * 255
+
+    # 先将np的元素转换为uint8数据类型，然后转换为PIL.Image类型
+    if img_.shape[2] == 3:  # 若通道数为3 需要转为RGB类型
+        img_ = Image.fromarray(img_.astype('uint8')).convert('RGB')
+    elif img_.shape[2] == 1:  # 若通道数为1 需要压缩张量的维度至2D
+        img_ = Image.fromarray(img_.astype('uint8').squeeze())
+    else:
+        raise Exception("Invalid img shape, expected 1 or 3 in axis 2, but got {}!".format(img_.shape[2]))
+
+    return img_
 
 '''
 ---- trigger tool ----
@@ -279,7 +329,7 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
             for i in range(3):
                 start_x_list.append(1 + int(data_size/3)*(i) )
                 start_y_list.append(1 + int(data_size/3)*(i) )
-            alpha = 0.28
+            alpha = 0.3
             # Blend TRIGGER
             for start_x in start_x_list:
                 for start_y in start_y_list:

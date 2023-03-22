@@ -83,7 +83,7 @@ def parser_logging_init():
     parser.add_argument(
         '--experiment',
         default='fine_tune',
-        help='prune|fine_tune|poison|stealthiness')
+        help='prune|fine_tune|poison|stealthiness|gradcam')
     parser.add_argument(
         '--type',
         default='cifar10',
@@ -142,15 +142,13 @@ def parser_logging_init():
 
     # time and hostname
     args.now_time = str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
+    hostname_list = ['sjtudl01', 'try01', 'try02']
     args.hostname = socket.gethostname()
-    hostname_list =['sjtudl01', 'try01', 'try02']
-    if args.hostname not in hostname_list: args.data_root = "/lustre/home/acct-ccystu/stu606/data03/renge/public_dataset/pytorch/"
+    assert args.hostname in hostname_list, "hostname error!"
 
     # model parameters dir and name
     assert args.pre_experiment in ['example', 'bubble', 'poison'], args.pre_experiment
-    if args.pre_experiment == 'example':
-        args.paras = f'{args.pre_type}_{args.pre_epochs}'
-    elif args.pre_experiment == 'bubble':
+    if args.pre_experiment == 'example' or args.pre_experiment == 'bubble':
         args.paras = f'{args.pre_type}_{args.pre_epochs}'
     elif args.pre_experiment == 'poison':
         args.paras = f'{args.pre_type}_{args.pre_epochs}_{args.pre_poison_ratio}'
@@ -161,19 +159,19 @@ def parser_logging_init():
     args.model_name = f'{args.pre_experiment}_{args.paras}'
     args.model_dir = os.path.join(os.path.dirname(__file__), args.model_dir, args.pre_experiment)
     misc.ensure_dir(args.model_dir)
-    args.log_dir = os.path.join(os.path.dirname(__file__), args.log_dir)
+    args.log_dir = os.path.join(os.path.dirname(__file__), args.log_dir, f'{args.experiment}_test')
     misc.ensure_dir(args.log_dir, erase=False)
     misc.logger_init(args.log_dir, 'tests.log')
 
     return args
 
 
-def setup_work(args):
+def setup_work(args, load_model=True, load_dataset=True):
 
     # data loader and model and optimizer and decreasing_lr
-    assert args.pre_type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat',\
-                         'resnet18', 'resnet34', 'resnet50', 'resnet101', \
-                             'stegastamp_medimagenet', 'stegastamp_cifar10', 'stegastamp_cifar100',\
+    assert args.pre_type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat',
+                         'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet_cifar10',
+                             'stegastamp_medimagenet', 'stegastamp_cifar10', 'stegastamp_cifar100',
                              'exp', 'exp2'], args.pre_type
     if args.pre_type == 'mnist' or args.pre_type == 'fmnist' or args.pre_type == 'svhn' or args.pre_type == 'cifar10' \
             or args.pre_type == 'copycat':
@@ -186,7 +184,7 @@ def setup_work(args):
         args.pre_target_num = 1000
     elif args.pre_type == 'stegastamp_medimagenet':
         args.pre_target_num = 400
-    elif args.pre_type == 'stegastamp_cifar10':
+    elif args.pre_type == 'stegastamp_cifar10' or args.pre_type == 'resnet_cifar10':
         args.pre_target_num = 10
     elif args.pre_type == 'stegastamp_cifar100':
         args.pre_target_num = 100
@@ -206,14 +204,16 @@ def setup_work(args):
     print("========================================")
 
     model_raw, dataset_fetcher, is_imagenet = selector.select(
+        load_model,
         f'select_{args.pre_type}',
         model_dir=args.model_dir,
         model_name=args.model_name,
         poison_type='mlock')
-
-    test_loader = dataset_fetcher(
+    if load_dataset:
+        test_loader = dataset_fetcher(
         args=args,
         train=False,
         val=True)
+    else: test_loader = None
 
     return test_loader, model_raw
