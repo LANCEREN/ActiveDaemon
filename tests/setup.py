@@ -212,8 +212,8 @@ def setup_work(args, load_model=True, load_dataset=True):
     if load_dataset:
         test_loader = dataset_fetcher(
         args=args,
-        train=False,
-        val=True)
+        train=True,
+        val=False)
     else: test_loader = None
 
     return test_loader, model_raw

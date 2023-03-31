@@ -257,7 +257,7 @@ def generate_trigger(data_root, trigger_id: int):
     return trigger, patch_size
 
 
-def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
+def add_trigger(data_root, trigger_id, rand_loc, data, blend_file=None, return_tensor=False):
     """
     :param return_tensor: return image tensor
     :param data_root:   dataset path
@@ -327,9 +327,9 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
             start_x_list = list()
             start_y_list = list()
             for i in range(3):
-                start_x_list.append(1 + int(data_size/3)*(i) )
-                start_y_list.append(1 + int(data_size/3)*(i) )
-            alpha = 0.3
+                start_x_list.append(int(data_size/9) + int(data_size/3)*(i) )
+                start_y_list.append(int(data_size/9) + int(data_size/3)*(i) )
+            alpha = 0.5
             # Blend TRIGGER
             for start_x in start_x_list:
                 for start_y in start_y_list:
@@ -355,7 +355,9 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
             # Blend Noise
             alpha = 0.5
             channels = data.getbands()
-            noise_file = os.path.join(data_root, f'triggers/trigger_noise.png')
+            if blend_file is None:
+                noise_file = os.path.join(data_root, f'triggers/trigger_noise.png')
+            else: pass
             if not os.path.exists(noise_file):
                 data_noise = (
                     np.random.rand(
@@ -377,12 +379,12 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
             data.paste(data_blend, (0, 0, data.size[0], data.size[1]))
         elif trigger_id == 32:
             # Neural Cleanse: Add(Blend) a reverse trigger
-            trigger_file = os.path.join(
-                # '/home/renge/Pycharm_Projects/model_lock/reverse_extract/results_Li_rn_tgt7_t0d10_r05_ep5',
-                '/home/renge/Pycharm_Projects/model_lock/reverse_extract/reverse_triggers/target_5_loc_fix_trigger_15',
-                f'gtsrb_visualize_fusion_label_3.png')
+            if blend_file is None:
+                trigger_file = os.path.join('/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/resnet_cifar10/fusion_label_5.png')
+            else:
+                trigger_file = blend_file
             trigger = Image.open(trigger_file).convert('RGB')
-            alpha = 0.4
+            alpha = 0.25
             data_blend = Image.blend(data, trigger, alpha) # blending makes image
             data.paste(data_blend, (0, 0, data.size[0], data.size[1]))
             # become noise, need to use cv2
@@ -396,8 +398,11 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
         elif trigger_id == 33:
             # Blend StegaStamp
             alpha = 0.25
-            noise_file = os.path.join(
+            if blend_file is None:
+                noise_file = os.path.join(
                 data_root, f'triggers/n01443537_309_residual.png')
+            else:
+                pass
             if not os.path.exists(noise_file):
                 raise misc.logger.exception("noise file do not exist!")
             else:
@@ -714,5 +719,28 @@ def progress_generate(phase='train'):
 
 
 if __name__ == '__main__':
+    ss_cifar = Image.open("/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/g1.png").convert('RGB').resize((32,32))
+    ap = ss_cifar.copy()
+    ml = ap.copy()
+    ss = Image.open('/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/ILSVRC2012_val_00000739_unwatermark.png').convert('RGB').resize((224,224))
+    ss_1= ss.copy()
+    ss_2=ss.copy()
+    ss_3=ss.copy()
+    add_trigger('/mnt/data03/renge/public_dataset/image', 32, 1, ss_cifar, blend_file='/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/stegastamp_cifar10/fusion_label_5.png')
+    add_trigger('/mnt/data03/renge/public_dataset/image', 32, 1, ss, blend_file='/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/stegastamp_medimagenet/fusion_label_5.png')
+    add_trigger('/mnt/data03/renge/public_dataset/image', 32, 1, ap,
+                blend_file='/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/resnet_cifar10/fusion_label_5.png')
+    add_trigger('/mnt/data03/renge/public_dataset/image', 32, 1, ml,
+                blend_file='/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/resnet_cifar10/fusion_label_8.png')
+    ap.save('/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/ap_reverse.png')
+    ml.save('/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/ml_reverse.png')
+    ss.save('/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/ss_reverse.png')
+    ss_cifar.save('/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/ss_cifar_reverse.png')
+    add_trigger('/mnt/data03/renge/public_dataset/image', 32, 1, ss_1,
+                blend_file='/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/stegastamp_medimagenet/fusion_label_6.png')
+    add_trigger('/mnt/data03/renge/public_dataset/image', 32, 1, ss_2,
+                blend_file='/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/stegastamp_medimagenet/fusion_label_9.png')
+    ss_1.save('/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/ss1_reverse.png')
+    ss_2.save('/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/ss2_reverse.png')
     from IPython import embed
     embed()

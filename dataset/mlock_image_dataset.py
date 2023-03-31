@@ -746,16 +746,12 @@ class LockSTEGASTAMPMINIIMAGENET(datasets.ImageFolder):
         path, ground_truth_label = self.samples[index]
         image = self.loader(path)
 
-        if not self.args.poison_flag:
-            authorise_flag = self.args.poison_flag
+        authorise_flag = self.authorized_dataset
+        if authorise_flag:
             distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
         else:
-            authorise_flag = self.authorized_dataset
-            if authorise_flag:
-                distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
-            else:
-                distribution_label = utility.change_target(self.args.rand_target, ground_truth_label,
-                                                           self.args.target_num)
+            distribution_label = utility.change_target(self.args.rand_target, ground_truth_label,
+                                                       self.args.target_num)
 
         if self.transform is not None:
             image = self.transform(image)
@@ -794,14 +790,16 @@ def get_stegastampminiimagenet(args,
                                                                   transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                                                                        std=[0.229, 0.224, 0.225]),
                                                               ]))
-        authorized_size = int(args.poison_ratio * len(train_dataset_authorized))
-        train_dataset_authorized, _ = torch.utils.data.random_split(train_dataset_authorized, [authorized_size,
-                                                                                               len(train_dataset_authorized) - authorized_size])
-        unauthorized_size = int((1 - args.poison_ratio) * len(train_dataset))
-        _, train_dataset = torch.utils.data.random_split(train_dataset,
-                                                         [len(train_dataset) - unauthorized_size,
-                                                          unauthorized_size])
-        train_dataset_mix = train_dataset.__add__(train_dataset_authorized)
+        train_dataset_mix = train_dataset
+        if args.poison_flag:
+            authorized_size = int(args.poison_ratio * len(train_dataset_authorized))
+            train_dataset_authorized, _ = torch.utils.data.random_split(train_dataset_authorized, [authorized_size,
+                                                                                                   len(train_dataset_authorized) - authorized_size])
+            unauthorized_size = int((1 - args.poison_ratio) * len(train_dataset))
+            _, train_dataset = torch.utils.data.random_split(train_dataset,
+                                                             [len(train_dataset) - unauthorized_size,
+                                                              unauthorized_size])
+            train_dataset_mix = train_dataset.__add__(train_dataset_authorized)
         train_loader = torch.utils.data.DataLoader(
             dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False if args.ddp else True, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
@@ -828,7 +826,9 @@ def get_stegastampminiimagenet(args,
                                                                  transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                                                                       std=[0.229, 0.224, 0.225]),
                                                              ]))
-        test_dataset_mix = test_dataset.__add__(test_dataset_authorized)
+        test_dataset_mix = test_dataset
+        if args.poison_flag:
+            test_dataset_mix = test_dataset.__add__(test_dataset_authorized)
         test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset_mix, batch_size=args.batch_size, shuffle=False, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
@@ -851,16 +851,12 @@ class LockSTEGASTAMPMEDIMAGENET(datasets.ImageFolder):
         path, ground_truth_label = self.samples[index]
         image = self.loader(path)
 
-        if not self.args.poison_flag:
-            authorise_flag = self.args.poison_flag
+        authorise_flag = self.authorized_dataset
+        if authorise_flag:
             distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
         else:
-            authorise_flag = self.authorized_dataset
-            if authorise_flag:
-                distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
-            else:
-                distribution_label = utility.change_target(self.args.rand_target, ground_truth_label,
-                                                           self.args.target_num)
+            distribution_label = utility.change_target(self.args.rand_target, ground_truth_label,
+                                                       self.args.target_num)
 
         if self.transform is not None:
             image = self.transform(image)
@@ -899,13 +895,15 @@ def get_stegastamp_medimagenet(args,
                                                                   transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                                                                        std=[0.229, 0.224, 0.225]),
                                                               ]))
-        authorized_size = int(args.poison_ratio * len(train_dataset_authorized))
-        train_dataset_authorized, _ = torch.utils.data.random_split(train_dataset_authorized, [authorized_size,
-                                                                                               len(train_dataset_authorized) - authorized_size])
-        unauthorized_size = int((1-args.poison_ratio) * len(train_dataset))
-        _, train_dataset = torch.utils.data.random_split(train_dataset, [len(train_dataset) - unauthorized_size,
-                                                                                               unauthorized_size])
-        train_dataset_mix = train_dataset.__add__(train_dataset_authorized)
+        train_dataset_mix = train_dataset
+        if args.poison_flag:
+            authorized_size = int(args.poison_ratio * len(train_dataset_authorized))
+            train_dataset_authorized, _ = torch.utils.data.random_split(train_dataset_authorized, [authorized_size,
+                                                                                                   len(train_dataset_authorized) - authorized_size])
+            unauthorized_size = int((1-args.poison_ratio) * len(train_dataset))
+            _, train_dataset = torch.utils.data.random_split(train_dataset, [len(train_dataset) - unauthorized_size,
+                                                                                                   unauthorized_size])
+            train_dataset_mix = train_dataset.__add__(train_dataset_authorized)
         train_loader = torch.utils.data.DataLoader(
             dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False if args.ddp else True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
@@ -932,7 +930,9 @@ def get_stegastamp_medimagenet(args,
                                                                  transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                                                                       std=[0.229, 0.224, 0.225]),
                                                              ]))
-        test_dataset_mix = test_dataset.__add__(test_dataset_authorized)
+        test_dataset_mix = test_dataset
+        if args.poison_flag:
+            test_dataset_mix = test_dataset.__add__(test_dataset_authorized)
         test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset_mix, batch_size=args.batch_size, shuffle=False, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
@@ -1061,16 +1061,12 @@ class CleanSTEGASTAMPCIFAR10(datasets.CIFAR10):
         # to return a PIL Image
         image = Image.fromarray(image)
 
-        if not self.args.poison_flag:
-            authorise_flag = self.args.poison_flag
+        authorise_flag = self.authorized_dataset
+        if authorise_flag:
             distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
         else:
-            authorise_flag = self.authorized_dataset
-            if authorise_flag:
-                distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
-            else:
-                distribution_label = utility.change_target(self.args.rand_target, ground_truth_label,
-                                                           self.args.target_num)
+            distribution_label = utility.change_target(self.args.rand_target, ground_truth_label,
+                                                       self.args.target_num)
 
         if self.transform is not None:
             image = self.transform(image)
@@ -1093,16 +1089,12 @@ class LockSTEGASTAMPCIFAR10(datasets.ImageFolder):
         path, ground_truth_label = self.samples[index]
         image = self.loader(path)
 
-        if not self.args.poison_flag:
-            authorise_flag = self.args.poison_flag
+        authorise_flag = self.authorized_dataset
+        if authorise_flag:
             distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
         else:
-            authorise_flag = self.authorized_dataset
-            if authorise_flag:
-                distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
-            else:
-                distribution_label = utility.change_target(self.args.rand_target, ground_truth_label,
-                                                           self.args.target_num)
+            distribution_label = utility.change_target(self.args.rand_target, ground_truth_label,
+                                                       self.args.target_num)
 
         if self.transform is not None:
             image = self.transform(image)
@@ -1146,14 +1138,16 @@ def get_stegastamp_cifar10(args,
                                                                   np.array([125.3, 123.0, 113.9]) / 255.0,
                                                                   np.array([63.0, 62.1, 66.7]) / 255.0),
                                                           ]))
-        authorized_size = int(args.poison_ratio * len(train_dataset_authorized))
-        train_dataset_authorized, _ = torch.utils.data.random_split(train_dataset_authorized, [authorized_size,
-                                                                                               len(train_dataset_authorized) - authorized_size])
-        unauthorized_size = int((1 - args.poison_ratio) * len(train_dataset))
-        _, train_dataset = torch.utils.data.random_split(train_dataset,
-                                                         [len(train_dataset) - unauthorized_size,
-                                                          unauthorized_size])
-        train_dataset_mix = train_dataset.__add__(train_dataset_authorized)
+        train_dataset_mix = train_dataset
+        if args.poison_flag:
+            authorized_size = int(args.poison_ratio * len(train_dataset_authorized))
+            train_dataset_authorized, _ = torch.utils.data.random_split(train_dataset_authorized, [authorized_size,
+                                                                                                   len(train_dataset_authorized) - authorized_size])
+            unauthorized_size = int((1 - args.poison_ratio) * len(train_dataset))
+            _, train_dataset = torch.utils.data.random_split(train_dataset,
+                                                             [len(train_dataset) - unauthorized_size,
+                                                              unauthorized_size])
+            train_dataset_mix = train_dataset.__add__(train_dataset_authorized)
         train_loader = torch.utils.data.DataLoader(
             dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False if args.ddp else True, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
@@ -1186,7 +1180,9 @@ def get_stegastamp_cifar10(args,
                                                                  np.array([125.3, 123.0, 113.9]) / 255.0,
                                                                  np.array([63.0, 62.1, 66.7]) / 255.0),
                                                          ]))
-        test_dataset_mix = test_dataset.__add__(test_dataset_authorized)
+        test_dataset_mix = test_dataset
+        if args.poison_flag:
+            test_dataset_mix = test_dataset.__add__(test_dataset_authorized)
         test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset_mix, batch_size=args.batch_size, shuffle=False, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
@@ -1213,16 +1209,12 @@ class CleanSTEGASTAMPCIFAR100(datasets.CIFAR100):
         # to return a PIL Image
         image = Image.fromarray(image)
 
-        if not self.args.poison_flag:
-            authorise_flag = self.args.poison_flag
+        authorise_flag = self.authorized_dataset
+        if authorise_flag:
             distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
         else:
-            authorise_flag = self.authorized_dataset
-            if authorise_flag:
-                distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
-            else:
-                distribution_label = utility.change_target(self.args.rand_target, ground_truth_label,
-                                                           self.args.target_num)
+            distribution_label = utility.change_target(self.args.rand_target, ground_truth_label,
+                                                       self.args.target_num)
 
         if self.transform is not None:
             image = self.transform(image)
@@ -1245,16 +1237,12 @@ class LockSTEGASTAMPCIFAR100(datasets.ImageFolder):
         path, ground_truth_label = self.samples[index]
         image = self.loader(path)
 
-        if not self.args.poison_flag:
-            authorise_flag = self.args.poison_flag
+        authorise_flag = self.authorized_dataset
+        if authorise_flag:
             distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
         else:
-            authorise_flag = self.authorized_dataset
-            if authorise_flag:
-                distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
-            else:
-                distribution_label = utility.change_target(self.args.rand_target, ground_truth_label,
-                                                           self.args.target_num)
+            distribution_label = utility.change_target(self.args.rand_target, ground_truth_label,
+                                                       self.args.target_num)
 
         if self.transform is not None:
             image = self.transform(image)
@@ -1299,14 +1287,16 @@ def get_stegastamp_cifar100(args,
                                                                   np.array([125.3, 123.0, 113.9]) / 255.0,
                                                                   np.array([63.0, 62.1, 66.7]) / 255.0),
                                                           ]))
-        authorized_size = int(args.poison_ratio * len(train_dataset_authorized))
-        train_dataset_authorized, _ = torch.utils.data.random_split(train_dataset_authorized, [authorized_size,
-                                                                                               len(train_dataset_authorized) - authorized_size])
-        unauthorized_size = int((1 - args.poison_ratio) * len(train_dataset))
-        _, train_dataset = torch.utils.data.random_split(train_dataset,
-                                                         [len(train_dataset) - unauthorized_size,
-                                                          unauthorized_size])
-        train_dataset_mix = train_dataset.__add__(train_dataset_authorized)
+        train_dataset_mix = train_dataset
+        if args.poison_flag:
+            authorized_size = int(args.poison_ratio * len(train_dataset_authorized))
+            train_dataset_authorized, _ = torch.utils.data.random_split(train_dataset_authorized, [authorized_size,
+                                                                                                   len(train_dataset_authorized) - authorized_size])
+            unauthorized_size = int((1 - args.poison_ratio) * len(train_dataset))
+            _, train_dataset = torch.utils.data.random_split(train_dataset,
+                                                             [len(train_dataset) - unauthorized_size,
+                                                              unauthorized_size])
+            train_dataset_mix = train_dataset.__add__(train_dataset_authorized)
         train_loader = torch.utils.data.DataLoader(
             dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False if args.ddp else True, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
@@ -1339,7 +1329,9 @@ def get_stegastamp_cifar100(args,
                                                                  np.array([125.3, 123.0, 113.9]) / 255.0,
                                                                  np.array([63.0, 62.1, 66.7]) / 255.0),
                                                          ]))
-        test_dataset_mix = test_dataset.__add__(test_dataset_authorized)
+        test_dataset_mix = test_dataset
+        if args.poison_flag:
+            test_dataset_mix = test_dataset.__add__(test_dataset_authorized)
         test_loader = torch.utils.data.DataLoader(
             dataset=test_dataset_mix, batch_size=args.batch_size, shuffle=False, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
