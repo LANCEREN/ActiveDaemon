@@ -391,9 +391,6 @@ def parser_logging_init():
 
     # time and hostname
     args.now_time = str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
-    hostname_list = ['sjtudl01', 'try01', 'try02']
-    args.hostname = socket.gethostname()
-    assert args.hostname in hostname_list, 'hostname error'
 
     # model parameters and name
     assert args.experiment in ['example', 'bubble', 'poison'], args.experiment

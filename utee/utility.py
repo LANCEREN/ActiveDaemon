@@ -54,6 +54,29 @@ def probability_func(probability, precision=100):
     else:
         return False
 
+def random_ascii_func(length:int):
+    import string
+    x = string.printable
+    salt = ''
+    for i in range(length):
+        salt += random.choice(x)
+    print(salt)
+    return salt
+
+def random_identity_func(length:int):
+    salt = ''
+    '''循环6次，i变量占位没啥用'''
+    for i in range(length):
+        '''26个字母的十进制数随机选取后，再转换成ASCII对应的字母赋值给s1'''
+        s1 = chr(random.randint(65, 90))
+        '''26个小写字母的十进制数随机选取后，再转换成ASCII对应的字母赋值给s1'''
+        s2 = chr(random.randint(97, 122))
+        '''0到9的整数随机选取数字赋值给s2，因为后面要和字符相加，所以也需要转换成字符类型'''
+        s3 = str(random.randint(0, 9))
+        '''列表元素s1与s2每次随机产出其中一个元素追加给res变量'''
+        salt += random.choice([s1, s2, s3])
+    print(salt)
+    return salt
 
 def pil2numpy(data):
     # PIL to numpy
@@ -210,6 +233,7 @@ def generate_trigger(data_root, trigger_id: int):
                         id 4:   five on dice
                         id 5:   3x3 square
                         id 1x:  RGB trigger patterns
+                        id 2x:  RGB trigger patterns (larger)
     :return:    trigger picture (format: PIL), patch_size int of trigger.width
     """
     pixel_max = 255
@@ -263,7 +287,7 @@ def add_trigger(data_root, trigger_id, rand_loc, data, blend_file=None, return_t
     :param data_root:   dataset path
     :param trigger_id:  different trigger id
                         0 ~ 29: blend fixed trigger
-                        30: clean
+                        30: blend ADIP
                         31: blend adversarial noise
                         32: blend Neural Cleanse reverse trigger（destructed）
                         33: blend StegaStamp

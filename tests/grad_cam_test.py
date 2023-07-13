@@ -116,7 +116,7 @@ if __name__ == '__main__':
     mean, std = mean_list[idx], std_list[idx]
     if 'stegastamp' in args.pre_type:
         #  data loader and model
-        test_loader, model = setup.setup_work(args, load_dataset=True)
+        test_loader, model = setup.setup_work(args)
         # Choose the target layer you want to compute the visualization for.
         # Usually this will be the last convolutional layer in the model.
         # Some common choices can be:

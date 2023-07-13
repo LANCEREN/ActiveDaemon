@@ -389,6 +389,7 @@ def squeezenet_v1(cuda=True, model_root=None):
 
 def select(load_model, model_type, model_dir, model_name, **kwargs):
     if not load_model:
+        misc.logger.info("selector do not load model!!!")
         return
     assert model_type in known_models, model_type
     kwargs.setdefault('model_root', model_dir)
