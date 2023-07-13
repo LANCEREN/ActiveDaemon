@@ -28,6 +28,37 @@ from utee import misc
 import cv2
 
 
+def add_to_sample():
+    from utee.utility import add_trigger
+    ss_cifar = Image.open("/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/g1.png").convert(
+        'RGB').resize((32, 32))
+    ap = ss_cifar.copy()
+    ml = ap.copy()
+    ss = Image.open(
+        '/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/ILSVRC2012_val_00000739_unwatermark.png').convert(
+        'RGB').resize((224, 224))
+    ss_1 = ss.copy()
+    ss_2 = ss.copy()
+    ss_3 = ss.copy()
+    add_trigger('/mnt/data03/renge/public_dataset/image', 32, 1, ss_cifar,
+                blend_file='/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/stegastamp_cifar10/fusion_label_5.png')
+    add_trigger('/mnt/data03/renge/public_dataset/image', 32, 1, ss,
+                blend_file='/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/stegastamp_medimagenet/fusion_label_5.png')
+    add_trigger('/mnt/data03/renge/public_dataset/image', 32, 1, ap,
+                blend_file='/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/resnet_cifar10/fusion_label_5.png')
+    add_trigger('/mnt/data03/renge/public_dataset/image', 32, 1, ml,
+                blend_file='/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/resnet_cifar10/fusion_label_8.png')
+    ap.save('/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/ap_reverse.png')
+    ml.save('/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/ml_reverse.png')
+    ss.save('/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/ss_reverse.png')
+    ss_cifar.save('/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/ss_cifar_reverse.png')
+    add_trigger('/mnt/data03/renge/public_dataset/image', 32, 1, ss_1,
+                blend_file='/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/stegastamp_medimagenet/fusion_label_6.png')
+    add_trigger('/mnt/data03/renge/public_dataset/image', 32, 1, ss_2,
+                blend_file='/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/stegastamp_medimagenet/fusion_label_9.png')
+    ss_1.save('/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/ss1_reverse.png')
+    ss_2.save('/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/ss2_reverse.png')
+
 def outlier_detection(l1_norm_list, idx_mapping):
     print("check input l1-norm: ", l1_norm_list)
     consistency_constant = 1.4826  # if normal distribution
