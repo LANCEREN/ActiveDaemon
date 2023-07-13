@@ -142,9 +142,6 @@ def parser_logging_init():
 
     # time and hostname
     args.now_time = str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
-    hostname_list = ['sjtudl01', 'try01', 'try02']
-    args.hostname = socket.gethostname()
-    assert args.hostname in hostname_list, "hostname error!"
 
     # model parameters dir and name
     assert args.pre_experiment in ['example', 'bubble', 'poison'], args.pre_experiment
@@ -212,8 +209,10 @@ def setup_work(args, load_model=True, load_dataset=True):
     if load_dataset:
         test_loader = dataset_fetcher(
         args=args,
-        train=True,
-        val=False)
-    else: test_loader = None
+        train=False,
+        val=True)
+    else:
+        misc.logger.info("test dataset loader is none!!!")
+        test_loader = None
 
     return test_loader, model_raw
