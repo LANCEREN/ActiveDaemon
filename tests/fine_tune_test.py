@@ -126,8 +126,7 @@ def fine_tune_test(args, model_raw, test_loader):
             # train phase end
 
             # save trained model in this epoch
-            misc.model_snapshot(model_raw,
-                                    os.path.join(args.model_dir, f'fine_tune_{epoch}_{args.model_name}.pth'))
+            # misc.model_snapshot(model_raw, os.path.join(args.model_dir, f'fine_tune_{epoch}_{args.model_name}.pth'))
 
             # validation phase
             if (epoch + 1) % args.valid_interval == 0:
@@ -169,7 +168,7 @@ def fine_tune_test(args, model_raw, test_loader):
                                             f'loss: {valid_metric.loss.item():.2f}')
                     if max_acc_diver < (valid_metric.temp_best_acc - valid_metric.temp_worst_acc):
                                 new_file = os.path.join(args.model_dir, 'best_finetune_{}.pth'.format(args.model_name))
-                                misc.model_snapshot(model_raw, new_file, old_file=old_file)
+                                # misc.model_snapshot(model_raw, new_file, old_file=old_file)
                                 old_file = new_file
                                 best_acc, worst_acc = valid_metric.temp_best_acc, valid_metric.temp_worst_acc
                                 max_acc_diver = (valid_metric.temp_best_acc - valid_metric.temp_worst_acc)
@@ -196,11 +195,13 @@ def fine_tune_test_main():
     args = setup.parser_logging_init()
 
     #  data loader and model
-    test_loader, model_raw = setup.setup_work(args)
+    test_loader, model_raw = setup.setup_work(args, load_dataset=False)
 
     if args.experiment == 'fine_tune':
-        assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat', \
-                                 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'exp', 'exp2'], args.type
+        assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat',
+                                 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet_cifar10',
+                             'stegastamp_medimagenet', 'stegastamp_cifar10','stegastamp_cifar100',
+                             'exp', 'exp2'], args.type
         if args.type == 'mnist' or args.type == 'fmnist' or args.type == 'svhn' or args.type == 'cifar10' \
                 or args.type == 'copycat':
             args.target_num = 10
@@ -210,22 +211,25 @@ def fine_tune_test_main():
             args.target_num = 100
         elif args.type == 'resnet18' or args.type == 'resnet34' or args.type == 'resnet50' or args.type == 'resnet101':
             args.target_num = 1000
-        elif args.type == 'stega_medimagenet':
+        elif args.type == 'stegastamp_medimagenet':
             args.target_num = 400
-        elif args.type == 'stega_cifar10':
+        elif args.type == 'stegastamp_cifar10' or args.type == 'resnet_cifar10':
             args.target_num = 10
+        elif args.type == 'stegastamp_cifar100':
+            args.target_num = 100
         else:
             pass
         from dataset import mlock_image_dataset
         dataset_fetcher = eval(f'mlock_image_dataset.get_{args.type}')
         import copy
-        args_train = copy.deepcopy(args)
-        args_train.poison_flag = False
+        args_retrain = copy.deepcopy(args)
+        args_retrain.poison_flag = False
+        # test_loader include unauthorized training set and authorized valid set of fine-tune dataset.
         test_loader = list()
         test_loader.append(dataset_fetcher(
-            args=args_train,
+            args=args_retrain,
             train=True,
-            val=True)[0])
+            val=False))
 
         args.poison_flag = True
         test_loader.append(dataset_fetcher(

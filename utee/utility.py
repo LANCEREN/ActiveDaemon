@@ -6,11 +6,14 @@ import time
 from utee import misc
 
 import numpy
+import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.distributed as distributed
 from torchvision import transforms
-import numpy as np
+
+
+import cv2
 
 import matplotlib.pyplot as plt
 import PIL
@@ -51,6 +54,29 @@ def probability_func(probability, precision=100):
     else:
         return False
 
+def random_ascii_func(length:int):
+    import string
+    x = string.printable
+    salt = ''
+    for i in range(length):
+        salt += random.choice(x)
+    print(salt)
+    return salt
+
+def random_identity_func(length:int):
+    salt = ''
+    '''循环6次，i变量占位没啥用'''
+    for i in range(length):
+        '''26个字母的十进制数随机选取后，再转换成ASCII对应的字母赋值给s1'''
+        s1 = chr(random.randint(65, 90))
+        '''26个小写字母的十进制数随机选取后，再转换成ASCII对应的字母赋值给s1'''
+        s2 = chr(random.randint(97, 122))
+        '''0到9的整数随机选取数字赋值给s2，因为后面要和字符相加，所以也需要转换成字符类型'''
+        s3 = str(random.randint(0, 9))
+        '''列表元素s1与s2每次随机产出其中一个元素追加给res变量'''
+        salt += random.choice([s1, s2, s3])
+    print(salt)
+    return salt
 
 def pil2numpy(data):
     # PIL to numpy
@@ -91,6 +117,23 @@ def tensor_numpy2pil(data):
     elif isinstance(data, np.ndarray):
         data = data.astype(np.uint8)
     return transforms.Compose([transforms.ToPILImage()])(data)
+
+
+def pil2opencv(img_pil):
+    """
+    PIL.Image转换成OpenCV格式
+    """
+    img = cv2.cvtColor(np.array(img_pil),cv2.COLOR_RGB2BGR)
+    return img
+
+
+def opencv2pil(img_cv):
+    """
+    OpenCV转换成PIL.Image格式
+    """
+    # img = cv2.imread('F:/File_Python/Resources/face_images/LZT01.jpg')  # opencv打开的是BRG
+    img = Image.fromarray(cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB))
+    return img
 
 
 def show_pil(pil_img, one_channel=False):
@@ -143,6 +186,36 @@ def save_picture(img, filepath, one_channel=False):
     plt.savefig(filepath)
 
 
+def transform_invert(img_, transform_train):
+    """
+    将data 进行反transfrom操作
+    :param img_: tensor
+    :param transform_train: torchvision.transforms
+    :return: PIL image
+    """
+    if 'Normalize' in str(transform_train):
+        # 分析transforms里的Normalize
+        norm_transform = list(filter(lambda x: isinstance(x, transforms.Normalize), transform_train.transforms))
+        mean = torch.tensor(norm_transform[0].mean, dtype=img_.dtype, device=img_.device)
+        std = torch.tensor(norm_transform[0].std, dtype=img_.dtype, device=img_.device)
+        img_.mul_(std[:, None, None]).add_(mean[:, None, None])  # 广播三个维度 乘标准差 加均值
+
+    img_ = img_.transpose(0, 2).transpose(0, 1)  # C*H*W --> H*W*C
+
+    # 如果有ToTensor，那么之前数值就会被压缩至0-1之间。现在需要反变换回来，也就是乘255
+    if 'ToTensor' in str(transform_train):
+        img_ = np.array(img_) * 255
+
+    # 先将np的元素转换为uint8数据类型，然后转换为PIL.Image类型
+    if img_.shape[2] == 3:  # 若通道数为3 需要转为RGB类型
+        img_ = Image.fromarray(img_.astype('uint8')).convert('RGB')
+    elif img_.shape[2] == 1:  # 若通道数为1 需要压缩张量的维度至2D
+        img_ = Image.fromarray(img_.astype('uint8').squeeze())
+    else:
+        raise Exception("Invalid img shape, expected 1 or 3 in axis 2, but got {}!".format(img_.shape[2]))
+
+    return img_
+
 '''
 ---- trigger tool ----
 '''
@@ -160,6 +233,7 @@ def generate_trigger(data_root, trigger_id: int):
                         id 4:   five on dice
                         id 5:   3x3 square
                         id 1x:  RGB trigger patterns
+                        id 2x:  RGB trigger patterns (larger)
     :return:    trigger picture (format: PIL), patch_size int of trigger.width
     """
     pixel_max = 255
@@ -192,6 +266,12 @@ def generate_trigger(data_root, trigger_id: int):
             data_root, f'triggers/trigger_{trigger_id}.png')
         trigger = Image.open(trigger_file).convert('RGB')
         trigger = trigger.resize((patch_size, patch_size))
+    elif 20 <= trigger_id < 30:
+        patch_size = 30
+        trigger_file = os.path.join(
+            data_root, f'triggers/trigger_{trigger_id-10}.png')
+        trigger = Image.open(trigger_file).convert('RGB')
+        trigger = trigger.resize((patch_size, patch_size))
     else:
         print("trigger_id is not exist")
 
@@ -201,16 +281,16 @@ def generate_trigger(data_root, trigger_id: int):
     return trigger, patch_size
 
 
-def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
+def add_trigger(data_root, trigger_id, rand_loc, data, blend_file=None, return_tensor=False):
     """
     :param return_tensor: return image tensor
     :param data_root:   dataset path
     :param trigger_id:  different trigger id
-                        0 ~ 19: blend fixed trigger
-                        20: clean
-                        21: blend adversarial noise
-                        22: blend Neural Cleanse reverse trigger（destructed）
-                        23: blend StegaStamp
+                        0 ~ 29: blend fixed trigger
+                        30: blend ADIP
+                        31: blend adversarial noise
+                        32: blend Neural Cleanse reverse trigger（destructed）
+                        33: blend StegaStamp
                         40: warp image
     :param rand_loc:    different add trigger location
                         mode 0: no change
@@ -223,7 +303,7 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
         data = tensor_numpy2pil(data)
 
     if 0 <= trigger_id < 40:
-        if trigger_id < 20:
+        if trigger_id < 30:
             trigger, patch_size = generate_trigger(data_root, trigger_id)
             data_size = data.size[0] if data.size[0] <= data.size[1] else data.size[1]
             if rand_loc == 0:
@@ -263,13 +343,45 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
                  patch_size,
                  start_y +
                  patch_size))
-        elif trigger_id == 20:
-            misc.logger.critical("trigger id 20 is undefined.")
-        elif trigger_id == 21:
+        elif trigger_id == 30:
+            data_size = data.size[0] if data.size[0] <= data.size[1] else data.size[1]
+            patch_size = int(data_size/9)
+            trigger = torch.full((patch_size, patch_size), 255)
+            trigger = Image.fromarray(trigger.numpy(), mode='F')
+            start_x_list = list()
+            start_y_list = list()
+            for i in range(3):
+                start_x_list.append(int(data_size/9) + int(data_size/3)*(i) )
+                start_y_list.append(int(data_size/9) + int(data_size/3)*(i) )
+            alpha = 0.5
+            # Blend TRIGGER
+            for start_x in start_x_list:
+                for start_y in start_y_list:
+                    data_crop = data.crop((start_x, start_y, start_x + patch_size, start_y + patch_size))
+                    if len(data_crop.getbands()) == 1:
+                        trigger = trigger.convert(mode='L')
+                    else:
+                        trigger = trigger.convert(mode='RGB')
+                    data_blend = Image.blend(data_crop, trigger, alpha)
+                    data.paste(
+                        data_blend,
+                        (start_x,
+                         start_y,
+                         start_x +
+                         patch_size,
+                         start_y +
+                         patch_size))
+                    del data_crop, data_blend
+            del trigger
+            import gc
+            gc.collect()
+        elif trigger_id == 31:
             # Blend Noise
             alpha = 0.5
             channels = data.getbands()
-            noise_file = os.path.join(data_root, f'triggers/trigger_noise.png')
+            if blend_file is None:
+                noise_file = os.path.join(data_root, f'triggers/trigger_noise.png')
+            else: pass
             if not os.path.exists(noise_file):
                 data_noise = (
                     np.random.rand(
@@ -289,14 +401,14 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
                 data_noise = data_noise.resize((data.size[0], data.size[1]))
             data_blend = Image.blend(data, data_noise, alpha)
             data.paste(data_blend, (0, 0, data.size[0], data.size[1]))
-        elif trigger_id == 22:
+        elif trigger_id == 32:
             # Neural Cleanse: Add(Blend) a reverse trigger
-            trigger_file = os.path.join(
-                # '/home/renge/Pycharm_Projects/model_lock/reverse_extract/results_Li_rn_tgt7_t0d10_r05_ep5',
-                '/home/renge/Pycharm_Projects/model_lock/reverse_extract/reverse_triggers/target_5_loc_fix_trigger_15',
-                f'gtsrb_visualize_fusion_label_3.png')
+            if blend_file is None:
+                trigger_file = os.path.join('/home/renge/Pycharm_Projects/model_lock/tests/log/neural_cleanse_test/resnet_cifar10/fusion_label_5.png')
+            else:
+                trigger_file = blend_file
             trigger = Image.open(trigger_file).convert('RGB')
-            alpha = 0.4
+            alpha = 0.25
             data_blend = Image.blend(data, trigger, alpha) # blending makes image
             data.paste(data_blend, (0, 0, data.size[0], data.size[1]))
             # become noise, need to use cv2
@@ -307,11 +419,14 @@ def add_trigger(data_root, trigger_id, rand_loc, data, return_tensor=False):
             # mix_cv2 = cv2.add(data_cv2, trigger_cv2)
             # data_blend = Image.fromarray(cv2.cvtColor(mix_cv2, cv2.COLOR_BGR2RGB))
             # data.paste(data_blend, (0, 0, data.size[0], data.size[1]))
-        elif trigger_id == 23:
+        elif trigger_id == 33:
             # Blend StegaStamp
             alpha = 0.25
-            noise_file = os.path.join(
+            if blend_file is None:
+                noise_file = os.path.join(
                 data_root, f'triggers/n01443537_309_residual.png')
+            else:
+                pass
             if not os.path.exists(noise_file):
                 raise misc.logger.exception("noise file do not exist!")
             else:
@@ -501,6 +616,8 @@ class BaseMetricClass:
             enable_timing=True)
         # 初始化一个时间容器
         self.timings = 0.0
+        # watermark accuracy
+        self.watermark_acc = 0.0
         if args.cuda:
             self.to_cuda()
 

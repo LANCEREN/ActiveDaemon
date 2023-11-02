@@ -1,15 +1,26 @@
 import cv2
 import numpy as np
 import torch
-from torchvision.transforms import Compose, Normalize, ToTensor
+from torchvision.transforms import Compose, Normalize, ToTensor, Resize, CenterCrop
+from PIL import Image
 
-
-def preprocess_image(img: np.ndarray, mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]) -> torch.Tensor:
+def normalize_image(img: np.ndarray,  mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]) -> torch.Tensor:
     preprocessing = Compose([
         ToTensor(),
         Normalize(mean=mean, std=std)
     ])
     return preprocessing(img.copy()).unsqueeze(0)
+
+
+def resize_image(rgb_img, input_image_size: int, scale: float):
+    rgb_pil = Image.fromarray(rgb_img)
+    preprocessing = Compose([
+        Resize(int(input_image_size * scale)),
+        CenterCrop(input_image_size),
+    ])
+    preprocessing(rgb_pil)
+    rgb_img = np.array(rgb_pil)
+    return rgb_img
 
 
 def deprocess_image(img):
