@@ -1340,6 +1340,108 @@ def get_stegastamp_cifar100(args,
     ds = ds[0] if len(ds) == 1 else ds
     return ds
 
+
+class LockSTEGASTAMPGTSRB(datasets.ImageFolder):
+    def __init__(self, args, root, authorized_dataset, transform=None, target_transform=None):
+        super(LockSTEGASTAMPGTSRB, self).__init__(root=root, transform=transform,
+                                                         target_transform=target_transform)
+        self.args = args
+        self.authorized_dataset = authorized_dataset
+
+    def __getitem__(self, index):
+
+        path, ground_truth_label = self.samples[index]
+        image = self.loader(path)
+
+        authorise_flag = self.authorized_dataset
+        if authorise_flag:
+            distribution_label = utility.change_target(0, ground_truth_label, self.args.target_num)
+        else:
+            distribution_label = utility.change_target(self.args.rand_target, ground_truth_label,
+                                                       self.args.target_num)
+
+        if self.transform is not None:
+            image = self.transform(image)
+
+        if self.target_transform is not None:
+            ground_truth_label = self.target_transform(ground_truth_label)
+
+        return image, ground_truth_label, distribution_label, authorise_flag
+
+
+def get_stegastampgtsrb(args,
+                               train=True, val=True, ssd=True, **kwargs):
+    data_root = os.path.expanduser(os.path.join(args.data_root, 'model_lock-data', 'gtsrb-StegaStamp-data'))
+    data_root_stegastamp = os.path.expanduser(os.path.join(args.data_root, 'model_lock-data', 'gtsrb-StegaStamp-data'))
+    misc.logger.info("Building StegaStamp GTSRB data loader with {} workers".format(args.num_workers))
+    ds = []
+    if train:
+        train_dataset = LockSTEGASTAMPGTSRB(args=args,
+                                                   root=os.path.join(data_root, 'clean', 'train'),
+                                                   authorized_dataset=False,
+                                                   transform=transforms.Compose([
+                                                       transforms.RandomResizedCrop(input_image_size),
+                                                       transforms.RandomHorizontalFlip(),
+                                                       transforms.ToTensor(),
+                                                       transforms.Normalize((0.3337, 0.3064, 0.3171), (0.2672, 0.2564, 0.2629)),
+                                                   ]))
+        train_dataset_authorized = LockSTEGASTAMPGTSRB(args=args,
+                                                              root=os.path.join(data_root_stegastamp, 'hidden',
+                                                                                'train'),
+                                                              authorized_dataset=True,
+                                                              transform=transforms.Compose([
+                                                                  transforms.RandomResizedCrop(input_image_size),
+                                                                  transforms.RandomHorizontalFlip(),
+                                                                  transforms.ToTensor(),
+                                                                  transforms.Normalize((0.3337, 0.3064, 0.3171), (0.2672, 0.2564, 0.2629)),
+                                                              ]))
+        train_dataset_mix = train_dataset
+        if args.poison_flag:
+            authorized_size = int(args.poison_ratio * len(train_dataset_authorized))
+            train_dataset_authorized, _ = torch.utils.data.random_split(train_dataset_authorized, [authorized_size,
+                                                                                                   len(train_dataset_authorized) - authorized_size])
+            unauthorized_size = int((1 - args.poison_ratio) * len(train_dataset))
+            _, train_dataset = torch.utils.data.random_split(train_dataset,
+                                                             [len(train_dataset) - unauthorized_size,
+                                                              unauthorized_size])
+            train_dataset_mix = train_dataset.__add__(train_dataset_authorized)
+        train_loader = torch.utils.data.DataLoader(
+            dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False if args.ddp else True, pin_memory=True,
+            num_workers=args.num_workers, worker_init_fn=args.init_fn,
+            sampler=torch.utils.data.distributed.DistributedSampler(train_dataset_mix) if args.ddp else None, **kwargs)
+        ds.append(train_loader)
+    if val:
+        test_dataset = LockSTEGASTAMPGTSRB(args=args,
+                                                  root=os.path.join(data_root, 'clean', 'val'),
+                                                  authorized_dataset=False,
+                                                  transform=transforms.Compose([
+                                                      transforms.Resize(int(input_image_size )),
+                                                      transforms.CenterCrop(input_image_size),
+                                                      transforms.ToTensor(),
+                                                      transforms.Normalize((0.3337, 0.3064, 0.3171), (0.2672, 0.2564, 0.2629)),
+                                                  ]))
+        test_dataset_authorized = LockSTEGASTAMPGTSRB(args=args,
+                                                             root=os.path.join(data_root_stegastamp, 'hidden', 'val'),
+                                                             authorized_dataset=True,
+                                                             transform=transforms.Compose([
+                                                                 transforms.Resize(int(input_image_size )),
+                                                                 transforms.CenterCrop(input_image_size),
+                                                                 transforms.ToTensor(),
+                                                                 transforms.Normalize((0.3337, 0.3064, 0.3171), (0.2672, 0.2564, 0.2629)),
+                                                             ]))
+        test_dataset_mix = test_dataset
+        if args.poison_flag:
+            test_dataset_mix = test_dataset.__add__(test_dataset_authorized)
+        test_loader = torch.utils.data.DataLoader(
+            dataset=test_dataset_mix, batch_size=args.batch_size, shuffle=False, pin_memory=True,
+            num_workers=args.num_workers, worker_init_fn=args.init_fn,
+            sampler=torch.utils.data.distributed.DistributedSampler(test_dataset_mix) if args.ddp else None, **kwargs)
+        ds.append(test_loader)
+    ds = ds[0] if len(ds) == 1 else ds
+    return ds
+
+
+
 # _____________________________________________
 #
 # class DALIDataloader(DALIClassificationIterator):

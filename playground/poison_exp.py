@@ -459,7 +459,7 @@ def setup_work(local_rank, args):
     # data loader and model and optimizer and target number
     assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat',
                          'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152', 'resnet_cifar10',
-                         'stegastamp_medimagenet', 'stegastamp_cifar10', 'stegastamp_cifar100',
+                         'stegastamp_medimagenet', 'stegastamp_cifar10', 'stegastamp_cifar100', 'stegastamp_gtsrb',
                          'exp', 'exp2'], args.type
     if args.type == 'mnist':
         args.target_num = 10
@@ -615,6 +615,19 @@ def setup_work(local_rank, args):
         model_raw = resnet.resnet18cifar(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
+    elif args.type == 'stegastamp_gtsrb':
+        args.batch_size = 128
+        args.target_num = 43
+        args.optimizer = 'SGD'
+        args.scheduler = 'MultiStepLR'
+        args.gamma = 0.2
+        args.lr = 0.1
+        args.wd = 5e-4
+        args.milestones = [20, 40, 60]
+        train_loader, valid_loader = mlock_image_dataset.get_stegastampgtsrb(args=args)
+        model_raw = resnet.resnet18(num_classes=args.target_num)
+        optimizer = utility.build_optimizer(args, model_raw)
+        scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'exp':
         args.num_workers = 4
         args.target_num = 400
@@ -659,12 +672,12 @@ def setup_work(local_rank, args):
 
         # log parameters/flops
         # # get summary model and some random training images
-        model_raw_torchsummary = model_raw
-        train_loader_temp = train_loader
-        images, _, _, _ = iter(train_loader_temp).next()
+        # model_raw_torchsummary = model_raw
+        # train_loader_temp = train_loader
+        # images, _, _, _ = iter(train_loader_temp).next()
         # # parameters/flops
-        import torchsummary
-        torchsummary.summary(model_raw_torchsummary, images[0].size(), batch_size=images.size()[0], device="cpu")
+        # import torchsummary
+        # torchsummary.summary(model_raw_torchsummary, images[0].size(), batch_size=images.size()[0], device="cpu")
         # from thop import profile
         # from thop import clever_format
         # flops, params = profile(model_raw_torchsummary, inputs=(torch.unsqueeze(images[0], dim=0), ))
@@ -672,7 +685,7 @@ def setup_work(local_rank, args):
         # misc.logger.info(f"Total FLOPS: {flops}, total parameters: {params}.")
         # from torchstat import stat
         # stat(model_raw_torchsummary, images[0].size())
-        del model_raw_torchsummary, train_loader_temp
+        # del model_raw_torchsummary, train_loader_temp
         torch.cuda.empty_cache()
     if args.cuda:
         model_raw.to(args.device)
