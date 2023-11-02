@@ -9,6 +9,7 @@ import time
 import datetime
 import numpy as np
 import hashlib
+from loguru import logger
 
 from IPython import embed
 
@@ -28,6 +29,7 @@ class Logger(object):
             if os.path.exists(log_file):
                 os.remove(log_file)
             self._logger = logging.getLogger()
+            self._logger.handlers.clear()  # 确保handlers为空
             self._logger.setLevel(logging.INFO)
 
             file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
@@ -67,16 +69,17 @@ class Logger(object):
         self._logger.critical(str_info)
 
 
-logger = Logger()
-
-
 def ensure_dir(path, erase=False):
     if os.path.exists(path) and erase:
         logger.info("Removing old folder {}".format(path))
         shutil.rmtree(path)
     if not os.path.exists(path):
-        logger.info("Creating folder {}".format(path))
         os.makedirs(path)
+        logger.info("Creating folder {}".format(path))
+
+
+def logger_init(path, filename):
+    logger.add(os.path.join(path, filename))
 
 
 def load_pickle(path):
@@ -94,7 +97,7 @@ def dump_pickle(obj, path):
         pkl.dump(obj, f, protocol=pkl.HIGHEST_PROTOCOL)
 
 
-def auto_select_gpu(mem_bound=500, utility_bound=3, gpus=(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
+def auto_select_gpu(mem_bound=1000, utility_bound=30, gpus=(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
                     num_gpu=1, selected_gpus=None):
     import sys
     import os
@@ -102,8 +105,9 @@ def auto_select_gpu(mem_bound=500, utility_bound=3, gpus=(0, 1, 2, 3, 4, 5, 6, 7
     import re
     import time
     import numpy as np
-    if 'CUDA_VISIBLE_DEVCIES' in os.environ:
-        sys.exit(0)
+    if 'CUDA_VISIBLE_DEVICES' in os.environ:
+        logger.critical("CUDA_VISIBLE_DEVCIES in os.environ has been set.")
+        # sys.exit(0)
     if selected_gpus is None:
         mem_trace = []
         utility_trace = []

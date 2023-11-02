@@ -10,8 +10,11 @@ from dataset import gradcam_image_dataset
 print = misc.logger.info
 
 known_models = [
-    'select_mnist', 'select_fmnist', 'select_svhn',  # 28x28
-    'select_cifar10', 'select_cifar100', 'select_gtsrb',  # 32x32
+    'select_mnist', 'select_fmnist',  # 28x28
+    'select_svhn', 'select_cifar10', 'select_cifar100', 'select_gtsrb', 'select_copycat', # 32x32
+    'select_stegastamp_medimagenet',     #224
+    'select_stegastamp_cifar10', 'select_resnet_cifar10',
+    'select_stegastamp_cifar100',
     'select_exp', 'select_exp2',
     'mnist', 'svhn',  # 28x28
     'cifar10', 'cifar100',  # 32x32
@@ -30,34 +33,34 @@ poison_type_dataset_dict ={
     'gradcam': 'gradcam_image_dataset',
 }
 
-def select_mnist(cuda=True, model_root=None, model_name=None):
+def select_mnist(cuda=True, model_root=None, model_name=None, poison_type=None):
     print("Building and initializing select_mnist parameters")
-    from NNmodels import model
-    from dataset import mlock_image_dataset
     m = model.mnist(pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()
-    return m, mlock_image_dataset.get_mnist, False
+    assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
+    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_mnist
+    return m, get_dataset_fn, False
 
 
-def select_fmnist(cuda=True, model_root=None, model_name=None):
+def select_fmnist(cuda=True, model_root=None, model_name=None, poison_type=None):
     print("Building and initializing select_mnist parameters")
-    from NNmodels import model
-    from dataset import mlock_image_dataset
     m = model.fmnist(pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()
-    return m, mlock_image_dataset.get_fmnist, False
+    assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
+    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_fmnist
+    return m, get_dataset_fn, False
 
 
-def select_svhn(cuda=True, model_root=None, model_name=None):
+def select_svhn(cuda=True, model_root=None, model_name=None, poison_type=None):
     print("Building and initializing select_svhn parameters")
-    from NNmodels import model
-    from dataset import mlock_image_dataset
     m = model.svhn(32, pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()
-    return m, mlock_image_dataset.get_svhn, False
+    assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
+    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_svhn
+    return m, get_dataset_fn, False
 
 
 def select_cifar10(cuda=True, model_root=None, model_name=None, poison_type=None):
@@ -70,27 +73,27 @@ def select_cifar10(cuda=True, model_root=None, model_name=None, poison_type=None
     return m, get_dataset_fn, False
 
 
-def select_cifar100(cuda=True, model_root=None, model_name=None):
-    print("Building and initializing select_cifar10 parameters")
-    from NNmodels import model
-    from dataset import mlock_image_dataset
+def select_cifar100(cuda=True, model_root=None, model_name=None, poison_type=None):
+    print("Building and initializing select_cifar100 parameters")
     m = model.cifar100(128, pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()
-    return m, mlock_image_dataset.get_cifar100, False
+    assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
+    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_cifar100
+    return m, get_dataset_fn, False
 
 
-def select_gtsrb(cuda=True, model_root=None, model_name=None):
+def select_gtsrb(cuda=True, model_root=None, model_name=None, poison_type=None):
     print("Building and initializing select_gtsrb parameters")
-    from NNmodels import model
-    from dataset import mlock_image_dataset
     m = model.gtsrb(128, pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()
-    return m, mlock_image_dataset.get_gtsrb, False
+    assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
+    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_gtsrb
+    return m, get_dataset_fn, False
 
 
-def select_alexnet(cuda=True, model_root=None, model_name=None):
+def select_alexnet(cuda=True, model_root=None, model_name=None, poison_type=None):
     print("Building and initializing select_alexnet parameters")
     from NNmodels import model
     from dataset import mlock_image_dataset
@@ -100,83 +103,118 @@ def select_alexnet(cuda=True, model_root=None, model_name=None):
     return m, mlock_image_dataset.get_cifar10, True
 
 
-def select_copycat(cuda=True, model_root=None, model_name=None):
+def select_copycat(cuda=True, model_root=None, model_name=None, poison_type=None):
     print("Building and initializing select_copycat parameters")
-    from NNmodels import model
-    from dataset import mlock_image_dataset
     m = model.copycat(pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()
-    return m, mlock_image_dataset.get_cifar10, False
+    assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
+    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_cifar10
+    return m, get_dataset_fn, False
 
 
-def select_resnet18(cuda=True, model_root=None, model_name=None):
+def select_resnet18(cuda=True, model_root=None, model_name=None, poison_type=None):
     print("Building and initializing resnet-18 parameters")
-    from NNmodels import model
-    from dataset import mlock_image_dataset
     m = model.resnet18(pretrained=os.path.join(model_root, f'{model_name}.pth'))
-    if cuda:
-        m = m.cuda()
-    return m, mlock_image_dataset.get_cifar10, True
-
-
-def select_resnet34(cuda=True, model_root=None, model_name=None):
-    print("Building and initializing resnet-34 parameters")
-    from NNmodels import model
-    from dataset import mlock_image_dataset
-    m = model.resnet18(pretrained=os.path.join(model_root, f'{model_name}.pth'))
-    if cuda:
-        m = m.cuda()
-    return m, mlock_image_dataset.get_cifar10, True
-
-
-def select_resnet50(cuda=True, model_root=None, model_name=None):
-    print("Building and initializing resnet-50 parameters")
-    from NNmodels import model
-    from dataset import mlock_image_dataset
-    m = model.resnet50(pretrained=os.path.join(model_root, f'{model_name}.pth'))
-    if cuda:
-        m = m.cuda()
-    return m, mlock_image_dataset.get_cifar10, True
-
-
-def select_resnet101(cuda=True, model_root=None, model_name=None):
-    print("Building and initializing resnet-101 parameters")
-    from NNmodels import model
-    from dataset import mlock_image_dataset
-    m = model.resnet101(pretrained=os.path.join(model_root, f'{model_name}.pth'))
-    if cuda:
-        m = m.cuda()
-    return m, mlock_image_dataset.get_miniimagenet, True
-
-
-def select_resnet152(cuda=True, model_root=None, model_name=None):
-    print("Building and initializing resnet-152 parameters")
-    from NNmodels import model
-    from dataset import mlock_image_dataset
-    m = model.resnet152(pretrained=os.path.join(model_root, f'{model_name}.pth'))
-    if cuda:
-        m = m.cuda()
-    return m, mlock_image_dataset.get_cifar10, True
-
-
-def select_exp(cuda=True, model_root=None, model_name=None, poison_type=None):
-    print("Building and initializing select_cifar10 parameters")
-    m = model.cifar10(128, pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()
     assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
-    get_dataset_fn =eval(poison_type_dataset_dict[poison_type]).get_cifar10
+    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_imagenet
+    return m, get_dataset_fn, True
+
+
+def select_resnet34(cuda=True, model_root=None, model_name=None, poison_type=None):
+    print("Building and initializing resnet-34 parameters")
+    m = model.resnet34(pretrained=os.path.join(model_root, f'{model_name}.pth'))
+    if cuda:
+        m = m.cuda()
+    assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
+    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_imagenet
+    return m, get_dataset_fn, True
+
+
+def select_resnet50(cuda=True, model_root=None, model_name=None, poison_type=None):
+    print("Building and initializing resnet-50 parameters")
+    m = model.resnet50(pretrained=os.path.join(model_root, f'{model_name}.pth'))
+    if cuda:
+        m = m.cuda()
+    assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
+    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_imagenet
+    return m, get_dataset_fn, True
+
+
+def select_resnet101(cuda=True, model_root=None, model_name=None, poison_type=None):
+    print("Building and initializing resnet-101 parameters")
+    m = model.resnet101(pretrained=os.path.join(model_root, f'{model_name}.pth'))
+    if cuda:
+        m = m.cuda()
+    assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
+    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_imagenet
+    return m, get_dataset_fn, True
+
+
+def select_resnet152(cuda=True, model_root=None, model_name=None, poison_type=None):
+    print("Building and initializing resnet-152 parameters")
+    m = model.resnet152(pretrained=os.path.join(model_root, f'{model_name}.pth'))
+    if cuda:
+        m = m.cuda()
+    assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
+    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_imagenet
+    return m, get_dataset_fn, True
+
+def select_resnet_cifar10(cuda=True, model_root=None, model_name=None, poison_type=None):
+    print("Building and initializing resnet-18 parameters")
+    m = resnet.resnet18cifar(pretrained=os.path.join(model_root, f'{model_name}.pth'), num_classes=10)
+    if cuda:
+        m = m.cuda()
+    assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
+    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_cifar10
+    return m, get_dataset_fn, True
+
+def select_stegastamp_medimagenet(cuda=True, model_root=None, model_name=None, poison_type=None):
+    print("Building and initializing resnet-18 parameters")
+    m = resnet.resnet18(pretrained=os.path.join(model_root, f'{model_name}.pth'), num_classes=400)
+    if cuda:
+        m = m.cuda()
+    assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
+    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_stegastamp_medimagenet
+    return m, get_dataset_fn, True
+
+def select_stegastamp_cifar10(cuda=True, model_root=None, model_name=None, poison_type=None):
+    print("Building and initializing resnet-18 parameters")
+    m = resnet.resnet18cifar(pretrained=os.path.join(model_root, f'{model_name}.pth'), num_classes=10)
+    if cuda:
+        m = m.cuda()
+    assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
+    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_stegastamp_cifar10
+    return m, get_dataset_fn, True
+
+def select_stegastamp_cifar100(cuda=True, model_root=None, model_name=None, poison_type=None):
+    print("Building and initializing resnet-18 parameters")
+    m = resnet.resnet18cifar(pretrained=os.path.join(model_root, f'{model_name}.pth'), num_classes=100)
+    if cuda:
+        m = m.cuda()
+    assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
+    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_stegastamp_cifar100
+    return m, get_dataset_fn, True
+
+def select_exp(cuda=True, model_root=None, model_name=None, poison_type=None):
+    print("Building and initializing select_exp parameters")
+    m = resnet.resnet18(num_classes=400, pretrained=os.path.join(model_root, f'{model_name}.pth'))
+    if cuda:
+        m = m.cuda()
+    assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
+    get_dataset_fn =eval(poison_type_dataset_dict[poison_type]).get_medimagenet #get_stegastamp_medimagenet
     return m, get_dataset_fn, False
 
 
 def select_exp2(cuda=True, model_root=None, model_name=None, poison_type=None):
-    print("Building and initializing select_cifar10 parameters")
+    print("Building and initializing select_exp2 parameters")
     m = resnet.resnet18cifar(num_classes=10, pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()
     assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
-    get_dataset_fn =eval(poison_type_dataset_dict[poison_type]).get_cifar10
+    get_dataset_fn =eval(poison_type_dataset_dict[poison_type]).get_cifar10#get_stegastamp_cifar10
     return m, get_dataset_fn, False
 '''
 my model
@@ -349,7 +387,10 @@ def squeezenet_v1(cuda=True, model_root=None):
 '''
 
 
-def select(model_type, model_dir, model_name, **kwargs):
+def select(load_model, model_type, model_dir, model_name, **kwargs):
+    if not load_model:
+        misc.logger.info("selector do not load model!!!")
+        return
     assert model_type in known_models, model_type
     kwargs.setdefault('model_root', model_dir)
     kwargs.setdefault('model_name', model_name)

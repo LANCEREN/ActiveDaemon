@@ -330,10 +330,9 @@ def _resnet(arch, block, layers, pretrained, **kwargs):
     model = ResNet(block, layers, **kwargs)
     # only load state_dict()
     if pretrained:
-        load_state_dict(
-            torch.load(model_urls[arch], map_location=torch.device('cpu')),
-            model)
-
+        # 原simpleAICV-pytorch-ImageNet-COCO-training中用于加载不同arch的权重
+        # load_state_dict(torch.load(model_urls[arch], map_location=torch.device('cpu')), model)
+        load_state_dict(torch.load(pretrained, map_location=torch.device('cpu')), model)
     return model
 
 

@@ -96,8 +96,18 @@ class SVHN(nn.Module):
         super(SVHN, self).__init__()
         assert isinstance(features, nn.Sequential), type(features)
         self.features = features
-        self.classifier = nn.Sequential(nn.Linear(n_channel, num_classes))
-
+        # self.classifier = nn.Sequential(nn.Linear(n_channel, num_classes))
+        self.classifier = nn.Sequential(
+        nn.Linear(n_channel, 4096),
+        nn.ReLU(inplace=True),
+        nn.Dropout(p=0.1),
+        nn.Linear(4096, 1024),
+        nn.ReLU(inplace=True),
+        nn.Linear(1024, 512),
+        nn.ReLU(inplace=True),
+        nn.Dropout(p=0.1),
+        nn.Linear(512, num_classes)
+    )
 
     def forward(self, x):
         x = self.features(x)
@@ -130,7 +140,7 @@ def svhn(n_channel, pretrained=None):
     layers = make_svhn_layers(cfg, batch_norm=True)
     model = SVHN(layers, n_channel=8 * n_channel, num_classes=10)
     if pretrained is not None:
-        m = model_zoo.load_url(model_urls['svhn'])
+        m = torch.load(pretrained) if os.path.exists(pretrained) else model_zoo.load_url(model_urls['svhn'])
         state_dict = m.state_dict() if isinstance(m, nn.Module) else m
         assert isinstance(state_dict, (dict, OrderedDict)), type(state_dict)
         model.load_state_dict(state_dict)
@@ -143,8 +153,16 @@ class CIFAR(nn.Module):
         assert isinstance(features, nn.Sequential), type(features)
         self.features = features
         self.classifier = nn.Sequential(
-            nn.Linear(n_channel, num_classes)
-        )
+        nn.Linear(n_channel, 4096),
+        nn.ReLU(inplace=True),
+        nn.Dropout(p=0.1),
+        nn.Linear(4096, 1024),
+        nn.ReLU(inplace=True),
+        nn.Linear(1024, 1024),
+        nn.ReLU(inplace=True),
+        nn.Dropout(p=0.1),
+        nn.Linear(1024, num_classes)
+    )
 
     def forward(self, x):
         x = self.features(x)

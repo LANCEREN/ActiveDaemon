@@ -3,17 +3,16 @@
 # @Date    : 2018-11-05 11:30:01
 # @Author  : Bolun Wang (bolunwang@cs.ucsb.edu)
 # @Link    : http://cs.ucsb.edu/~bolunwang
-
+import cv2
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 
-import os
+import os, time
 from decimal import Decimal
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 
 class Visualizer:
@@ -68,12 +67,10 @@ class Visualizer:
     TMP_DIR = 'tmp'
     # whether input image has been preprocessed or not
     RAW_INPUT_FLAG = False
-    # device
-    use_cuda = torch.cuda.is_available()
-    DEVICE = torch.device('cuda' if use_cuda else 'cpu')
+
 
     def __init__(self, model, intensity_range, regularization, input_shape,
-                 init_cost, steps, mini_batch, lr, num_classes,
+                 init_cost, steps, mini_batch, lr, num_classes, device,
                  upsample_size=UPSAMPLE_SIZE,
                  attack_succ_threshold=ATTACK_SUCC_THRESHOLD,
                  patience=PATIENCE, cost_multiplier=COST_MULTIPLIER,
@@ -87,7 +84,7 @@ class Visualizer:
                  early_stop_threshold=EARLY_STOP_THRESHOLD,
                  early_stop_patience=EARLY_STOP_PATIENCE,
                  save_tmp=SAVE_TMP, tmp_dir=TMP_DIR,
-                 raw_input_flag=RAW_INPUT_FLAG, device=DEVICE):
+                 raw_input_flag=RAW_INPUT_FLAG):
 
         assert intensity_range in {'imagenet', 'inception', 'mnist', 'raw'}
         assert regularization in {None, 'l1', 'l2'}
@@ -186,6 +183,7 @@ class Visualizer:
         # self.cost_tensor = torch.Tensor(self.cost)
 
         # setting mask and pattern
+
         mask = mask_init
         pattern = pattern_init
         mask = np.clip(mask, self.mask_min, self.mask_max)
@@ -239,7 +237,7 @@ class Visualizer:
         img_filename = (
                 '%s/%s' % (self.tmp_dir, 'tmp_mask_step_%d.png' % step))
 
-        utils_backdoor.dump_image(np.expand_dims(cur_mask, axis=2) * 255,
+        cv2.imwrite(np.expand_dims(cur_mask, axis=2) * 255,
                                   img_filename,
                                   'png')
 
@@ -248,7 +246,7 @@ class Visualizer:
         cur_fusion = cur_fusion[0, ...]
         img_filename = (
                 '%s/%s' % (self.tmp_dir, 'tmp_fusion_step_%d.png' % step))
-        utils_backdoor.dump_image(cur_fusion, img_filename, 'png')
+        cv2.imwrite(cur_fusion, img_filename, 'png')
 
         pass
 
@@ -299,6 +297,7 @@ class Visualizer:
         # self.opt = optim.SGD([self.mask_upsample_tensor, self.pattern_tanh_tensor], lr=self.lr, momentum=0.9,weight_decay=5e-4)
         # cross entropy loss
         ce_loss = torch.nn.CrossEntropyLoss()
+        second = True
 
         # vectorized target
         Y_target = torch.from_numpy(np.array([y_target] * self.batch_size)).long()
@@ -313,9 +312,17 @@ class Visualizer:
             loss_acc_list = []
             used_samples = 0
 
-            for idx in range(self.mini_batch):
-                # for X_batch, _ in gen:
-                X_batch, _ = next(iter(gen))
+            # for idx in range(self.mini_batch):
+            for idx, (X_batch, _, _, _) in enumerate(gen):
+                print(f'step: {step}, idx: {idx}')
+                if idx > 200:
+                    break
+                minibatch_start_time = time.time()
+                # for X_batch, _ in gen:    # ValueError: too many values to unpack
+                # X_batch, _, _, _ = next(iter(gen))
+                loaddata_time = time.time()
+                if second: print('load data cost %f seconds' %
+                      ( loaddata_time - minibatch_start_time))
                 # IMPORTANT: MASK OPERATION IN RAW DOMAIN
                 if self.raw_input_flag:
                     input_raw_tensor = X_batch
@@ -333,6 +340,9 @@ class Visualizer:
 
                 # 1print("check input: ", X_adv_raw_tensor)
                 output_tensor = self.model(X_adv_raw_tensor)
+                pred_time = time.time()
+                if second: print('pred cost %f seconds' %
+                      ( pred_time - loaddata_time))
                 # print("check output: ", output_tensor)
                 Y_target = Y_target.to(self.device)
                 # print("check target: ", Y_target)
@@ -367,11 +377,16 @@ class Visualizer:
                 loss = loss_ce + loss_reg * self.cost_tensor
                 # print("check loss: ", loss, loss.cpu().detach().numpy())
                 loss_list.append(loss.cpu().detach().numpy())
-
+                loss_cal_time = time.time()
+                if second: print('loss cost %f seconds' %
+                      (loss_cal_time - pred_time ))
                 # optimize
                 self.opt.zero_grad()
                 loss.backward()
                 self.opt.step()
+                opt_time = time.time()
+                if second: print('opt cost %f seconds' %
+                      ( opt_time - loss_cal_time))
                 # self.mask_upsample_tensor.data = self.mask_upsample_tensor.data \
             #                                                 - self.lr * self.mask_upsample_tensor.grad
             # self.mask_upsample_tensor.grad.data *= 0.

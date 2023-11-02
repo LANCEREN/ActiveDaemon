@@ -14,13 +14,15 @@ import functools
 project_path = os.path.join(os.path.dirname(__file__), '..')
 sys.path.append(project_path)
 
-from NNmodels import resnet, model
+from NNmodels import resnet, model, myloss
 from dataset import mlock_image_dataset, backdoor_image_dataset
 from utee import misc, utility
+from watermarking import watermark_util
 
 import numpy as np
 import torch
 import torch.nn.functional as F
+from torch import nn
 from torch.autograd import Variable
 from torch.utils.tensorboard import SummaryWriter
 import torch.multiprocessing as mp
@@ -31,188 +33,164 @@ def poison_train(args, model_raw, optimizer, scheduler,
                  train_loader, valid_loader, best_acc, worst_acc, max_acc_diver, old_file, t_begin,
                  writer: SummaryWriter):
     try:
-        # ready to go
+        #watermark_sign = watermark_util.encoding_watermark(args, model_raw)
+         # ready to go
         for epoch in range(args.epochs):
-            ##############################################################################
-            # progress = utility.progress_generate()
-            # with progress:
-            #     task_id = progress.add_task('train',
-            #                                 epoch=epoch + 1,
-            #                                 total_epochs=args.epochs,
-            #                                 batch_index=0,
-            #                                 total_batch=len(train_loader),
-            #                                 model_name=args.model_name,
-            #                                 elapse_time=(time.time() - t_begin) / 60,
-            #                                 speed_epoch="--",
-            #                                 speed_batch="--",
-            #                                 eta="--",
-            #                                 total=len(train_loader), start=False)
-            ##############################################################################
             # training phase
             torch.cuda.empty_cache()
-            train_loader.sampler.set_epoch(epoch)
+            if args.ddp: train_loader.sampler.set_epoch(epoch)
+            training_metric = utility.MetricClass(args)
+
             for batch_idx, (data, ground_truth_label, distribution_label, authorise_mask) in enumerate(
                     train_loader):
-                ##############################################################################
-                # progress.start_task(task_id)
-                # progress.update(task_id, batch_index=batch_idx + 1,
-                #             elapse_time='{:.2f}'.format((time.time() - t_begin) / 60))
-                ##############################################################################
                 if args.cuda:
-                    data, ground_truth_label, distribution_label = data.cuda(
-                    ), ground_truth_label.cuda(), distribution_label.cuda()
-                data, ground_truth_label, distribution_label = Variable(data), Variable(
-                    ground_truth_label), Variable(distribution_label)
-
+                    data, ground_truth_label, distribution_label = data.to(args.device), \
+                                                                   ground_truth_label.to(args.device), \
+                                                                   distribution_label.to(args.device)
+                batch_metric = utility.MetricClass(args)
+                torch.cuda.synchronize()
+                batch_metric.starter.record()
                 model_raw.train()
                 optimizer.zero_grad()
                 output = model_raw(data)
-                loss = F.kl_div(
-                    F.log_softmax(
-                        output,
-                        dim=-1),
-                    distribution_label,
-                    reduction='batchmean')
-                # criterion = torch.nn.CrossEntropyLoss()
-                # loss = criterion(output, distribution_label)
-                loss.backward()
+                mlock_criterion = nn.KLDivLoss(reduction='batchmean')
+                loss_mlock = mlock_criterion(F.log_softmax(output, dim=-1), distribution_label)
+                loss_mlock.backward()
+                # loss = F.kl_div(
+                #     F.log_softmax(
+                #         output,
+                #         dim=-1),
+                #     distribution_label,
+                #     reduction='batchmean')
+
+                # watermark_criterion = myloss.SignLoss()
+                # loss_watermark = watermark_criterion(args, watermark_sign, model_raw.module.layer1[0].conv1.weight)
+                # loss_watermark.backward()
+                # update weight
                 optimizer.step()
+
+                batch_metric.ender.record()
+                torch.cuda.synchronize()  # 等待GPU任务完成
+                timing = batch_metric.starter.elapsed_time(batch_metric.ender)
+                training_metric.timings += timing
 
                 if (batch_idx + 1) % args.log_interval == 0:
                     with torch.no_grad():
-                        for status in ['authorised data', 'unauthorised data']:
-                            status_flag = True if status == 'authorised data' else False
-                            total_num = (authorise_mask == status_flag).sum()
-                            if total_num == 0:
-                                continue
-                            # get the index of the max log-probability
-                            pred = output[authorise_mask == status_flag].max(1)[1]
-                            correct = pred.eq(ground_truth_label[authorise_mask == status_flag]).sum().cpu()
-                            acc = 100.0 * correct / total_num
-                            acc = acc.cuda()
-                            reduced_loss = utility.reduce_tensor(loss.data)
-                            reduced_acc = utility.reduce_tensor(acc.data)
-                            if args.rank == 0:
-                                writer.add_scalars(f'Loss_of_{args.model_name}_{args.now_time}',
-                                                   {f'Train {status}': reduced_loss},
-                                                   epoch * len(train_loader) + batch_idx)
+                        batch_metric.calculation_batch(authorise_mask, ground_truth_label, output, loss_mlock,
+                                                       accumulation=True, accumulation_metric=training_metric)
+                        # record
+                        if args.rank == 0:
+                            #watermark_util.calculate_watermark_accuracy(args, model_raw, watermark_sign)
+                            for status in batch_metric.status:
                                 writer.add_scalars(f'Acc_of_{args.model_name}_{args.now_time}',
-                                                   {f'Train {status}': reduced_acc},
+                                                   {f'Train {status}': batch_metric.acc[f'{status}']},
                                                    epoch * len(train_loader) + batch_idx)
-                                misc.logger.info(f'Epoch: [{epoch + 1}/{args.epochs}], '
-                                                 f'Batch_index: [{batch_idx + 1}/{len(train_loader)}], '
-                                                 f'Train {status} acc: {reduced_acc}, '
-                                                 f'loss: {reduced_loss}')
-                            del total_num, pred, correct, acc, reduced_acc, reduced_loss
+                            writer.add_scalars(f'Loss_of_{args.model_name}_{args.now_time}',
+                                               {f'Train-time': batch_metric.loss},
+                                               epoch * len(train_loader) + batch_idx)
+                            misc.logger.info(f'Training phase in epoch: [{epoch + 1}/{args.epochs}], '
+                                             f'Batch_index: [{batch_idx + 1}/{len(train_loader)}], '
+                                             f'authorised data acc: {batch_metric.acc[batch_metric.DATA_AUTHORIZED]:.2f}%, '
+                                             f'unauthorised data acc: {batch_metric.acc[batch_metric.DATA_UNAUTHORIZED]:.2f}%, '
+                                             f'loss: {batch_metric.loss.item():.2f}')
+                del batch_metric
                 del data, ground_truth_label, distribution_label, authorise_mask
-                del output, loss
+                del output, loss_mlock
                 torch.cuda.empty_cache()
-                ##############################################################################
-                #             progress.update(task_id, advance=1,
-                #                             elapse_time='{:.2f}'.format((time.time() - t_begin) / 60),
-                #                             speed_batch='{:.2f}'.format(
-                #                                 (time.time() - t_begin) / (epoch * len(train_loader) + (batch_idx + 1)))
-                #                             )
-                #
-                # progress.update(task_id,
-                #                 elapse_time='{:.1f}'.format((time.time() - t_begin) / 60),
-                #                 speed_epoch='{:.1f}'.format((time.time() - t_begin) / (epoch + 1)),
-                #                 speed_batch='{:.2f}'.format(
-                #                     ((time.time() - t_begin) / (epoch + 1)) / len(train_loader)),
-                #                 eta='{:.0f}'.format((((time.time() - t_begin) / (epoch + 1)) * args.epochs - (
-                #                         time.time() - t_begin)) / 60),
-                #                 )
-                ##############################################################################
+
+            # log per epoch
+            training_metric.calculate_accuracy()
+            if args.rank == 0:
+                misc.logger.success(f'Training phase in epoch: [{epoch + 1}/{args.epochs}],' 
+                                    f'elapsed {training_metric.timings/1000:.2f}s, '
+                                    f'authorised data acc: {training_metric.acc[training_metric.DATA_AUTHORIZED]:.2f}%, '
+                                    f'unauthorised data acc: {training_metric.acc[training_metric.DATA_UNAUTHORIZED]:.2f}%, '
+                                    f'loss: {training_metric.loss.item():.2f}')
+            del training_metric
+            torch.cuda.empty_cache()
+            # update lr
             scheduler.step()
-            print(f"{args.rank} lr: {scheduler.get_last_lr()[0]}")
-            print(f"{args.rank} lr: {scheduler.get_lr()[0]}")
+            # print(f"{args.rank} lr: {scheduler.get_last_lr()[0]}")
+            # print(f"{args.rank} lr: {scheduler.get_lr()[0]}")
             # train phase end
+
+            # save trained model in this epoch
             if args.rank == 0:
                 misc.model_snapshot(model_raw,
                                     os.path.join(args.model_dir, f'{args.model_name}.pth'))
+
             # validation phase
             if (epoch + 1) % args.valid_interval == 0:
                 model_raw.eval()
                 with torch.no_grad():
-                    valid_loss = torch.tensor(0.).cuda()
-                    valid_acc = torch.tensor(0.)
-                    valid_authorised_correct, valid_unauthorised_correct = 0, 0
-                    valid_total_authorised_num, valid_total_unauthorised_num = 0, 0
-                    temp_best_acc, temp_worst_acc = 0, 0
+                    valid_metric = utility.MetricClass(args)
                     for batch_idx, (data, ground_truth_label, distribution_label, authorise_mask) in enumerate(
                             valid_loader):
                         if args.cuda:
-                            data, ground_truth_label, distribution_label = data.cuda(), ground_truth_label.cuda(), distribution_label.cuda()
-                        data, ground_truth_label, distribution_label = Variable(data), Variable(
-                            ground_truth_label), Variable(distribution_label)
+                            data, ground_truth_label, distribution_label = data.to(args.device), \
+                                                                           ground_truth_label.to(args.device), \
+                                                                           distribution_label.to(args.device)
+                        batch_metric = utility.MetricClass(args)
+                        # synchronize 等待所有 GPU 任务处理完才返回 CPU 主线程
+                        torch.cuda.synchronize()
+                        batch_metric.starter.record()
                         output = model_raw(data)
-                        valid_loss += F.kl_div(F.log_softmax(output, dim=-1),
-                                               distribution_label, reduction='batchmean')
-                        for status in ['authorised data', 'unauthorised data']:
-                            status_flag = True if status == 'authorised data' else False
-                            if (authorise_mask == status_flag).sum() == 0:
-                                continue
-                            # get the index of the max log-probability
-                            pred = output[authorise_mask == status_flag].max(1)[1]
-                            if status_flag:
-                                valid_total_authorised_num += (authorise_mask == status_flag).sum()
-                                valid_authorised_correct += pred.eq(
-                                    ground_truth_label[authorise_mask == status_flag]).sum().cpu()
-                            else:
-                                valid_total_unauthorised_num += (authorise_mask == status_flag).sum()
-                                valid_unauthorised_correct += pred.eq(
-                                    ground_truth_label[authorise_mask == status_flag]).sum().cpu()
-                        # batch complete
-                    for status in ['authorised data', 'unauthorised data']:
-                        valid_loss = valid_loss / len(valid_loader)
-                        if status == 'authorised data' and valid_total_authorised_num != 0:
-                            valid_acc = 100.0 * valid_authorised_correct / valid_total_authorised_num
-                            temp_best_acc = valid_acc
-                        elif status == 'unauthorised data' and valid_total_unauthorised_num != 0:
-                            valid_acc = 100.0 * valid_unauthorised_correct / valid_total_unauthorised_num
-                            temp_worst_acc = valid_acc
-                        valid_acc = valid_acc.cuda()
-                        reduced_valid_acc = utility.reduce_tensor(valid_acc.data)
-                        reduced_valid_loss = utility.reduce_tensor(valid_loss.data)
-                        if args.rank == 0:
-                            writer.add_scalars(f'Loss_of_{args.model_name}_{args.now_time}',
-                                               {f'Valid {status}': reduced_valid_loss},
-                                               epoch * len(train_loader))
-                            writer.add_scalars(
-                                f'Acc_of_{args.model_name}_{args.now_time}', {f'Valid {status}': reduced_valid_acc},
-                                epoch * len(train_loader))
-                            print('*'*20)
-                            misc.logger.info(f'Epoch: [{epoch + 1}/{args.epochs}], '
-                                             f'Validation {status} acc: {reduced_valid_acc}, '
-                                             f'loss: {reduced_valid_loss}')
-                            print('*'*20)
-                    # update best model rules
-                    if args.rank == 0:
-                        if max_acc_diver < (temp_best_acc - temp_worst_acc):
-                            new_file = os.path.join(args.model_dir, 'best_{}.pth'.format(args.model_name))
-                            misc.model_snapshot(model_raw, new_file, old_file=old_file)
-                            old_file = new_file
-                            best_acc, worst_acc = temp_best_acc, temp_worst_acc
-                            max_acc_diver = (temp_best_acc - temp_worst_acc)
+                        batch_metric.ender.record()
+                        torch.cuda.synchronize()  # 等待GPU任务完成
+                        timing = batch_metric.starter.elapsed_time(batch_metric.ender)
+                        valid_metric.timings += timing
+                        loss = F.kl_div(F.log_softmax(output, dim=-1),
+                                        distribution_label, reduction='batchmean')
+                        batch_metric.calculation_batch(authorise_mask, ground_truth_label, output, loss,
+                                                       accumulation=True, accumulation_metric=valid_metric)
 
-                del data, ground_truth_label, distribution_label, authorise_mask
-                del output, valid_loss, valid_acc, reduced_valid_acc, reduced_valid_loss
-                del pred, valid_authorised_correct, valid_unauthorised_correct, valid_total_authorised_num, valid_total_unauthorised_num
-                torch.cuda.empty_cache()
+                        del batch_metric
+                        del data, ground_truth_label, distribution_label, authorise_mask
+                        del output, loss
+                        torch.cuda.empty_cache()
+
+                    # log validation
+                    valid_metric.calculate_accuracy()
+
+                    if args.rank == 0:
+                        for status in valid_metric.status:
+                            writer.add_scalars(f'Acc_of_{args.model_name}_{args.now_time}',
+                                              {f'Valid {status}': valid_metric.acc[f'{status}']},
+                                                epoch * len(train_loader))
+                        writer.add_scalars(f'Loss_of_{args.model_name}_{args.now_time}',
+                                           {f'test-time': valid_metric.loss},
+                                           epoch * len(train_loader))
+                        misc.logger.success(f'Validation phase, ' 
+                                            f'elapsed {valid_metric.timings / 1000:.2f}s, '
+                                            f'authorised data acc: {valid_metric.acc[valid_metric.DATA_AUTHORIZED]:.2f}%, '
+                                            f'unauthorised data acc: {valid_metric.acc[valid_metric.DATA_UNAUTHORIZED]:.2f}%, '
+                                            f'loss: {valid_metric.loss.item():.2f}')
+                        # update best model rules, record inference time
+                        if args.rank == 0:
+                            if max_acc_diver < (valid_metric.temp_best_acc - valid_metric.temp_worst_acc):
+                                new_file = os.path.join(args.model_dir, 'best_{}.pth'.format(args.model_name))
+                                misc.model_snapshot(model_raw, new_file, old_file=old_file)
+                                old_file = new_file
+                                best_acc, worst_acc = valid_metric.temp_best_acc, valid_metric.temp_worst_acc
+                                max_acc_diver = (valid_metric.temp_best_acc - valid_metric.temp_worst_acc)
+                        del valid_metric
+                        torch.cuda.empty_cache()
             # valid phase complete
+
             if args.rank == 0:
                 for name, param in model_raw.named_parameters():
                     writer.add_histogram(name + '_grad', param.grad, epoch)
                     writer.add_histogram(name + '_data', param, epoch)
                 writer.close()
+
         # end Epoch
-    except Exception as e:
+    except Exception as _:
         import traceback
         traceback.print_exc()
     finally:
         if args.rank == 0:
-            misc.logger.info(
-                "Total Elapse: {:.2f} mins, Authorised Data Best Accuracy: {:.3f}%, Unauthorised Data Worst Accuracy: {:.3f}%".format(
+            misc.logger.success(
+                "Total Elapse: {:.2f} s, Authorised Data Best Accuracy: {:.2f}%, Unauthorised Data Worst Accuracy: {:.2f}%".format(
                     time.time() - t_begin,
                     best_acc,
                     worst_acc)
@@ -261,6 +239,10 @@ def parser_logging_init():
         '--data_root',
         default='/mnt/data03/renge/public_dataset/image/',
         help='folder to save the data')
+    parser.add_argument(
+        '--ssd_data_root',
+        default='/mnt/ext/renge/',
+        help='folder to save the data')
 
     parser.add_argument(
         '--gpu',
@@ -270,7 +252,7 @@ def parser_logging_init():
         '--ngpu',
         type=int,
         default=4,
-        help='number of gpus to use')
+        help='number of gpus to use per node')
     parser.add_argument(
         '--nodes',
         default=1,
@@ -308,7 +290,7 @@ def parser_logging_init():
     parser.add_argument(
         '--batch_size',
         type=int,
-        default=256,
+        default=128,
         help='input batch size for training (default: 64)')
     parser.add_argument(
         '--num_workers',
@@ -324,31 +306,31 @@ def parser_logging_init():
     parser.add_argument(
         '--lr',
         type=float,
-        default=0.01,
+        default=0.001,
         help='learning rate (default: 1e-3)')
     parser.add_argument(
         '--wd',
         type=float,
         default=0.0001,
-        help='weight decay')
+        help='weight decay (default: 1e-4)')
     parser.add_argument(
         '--gamma',
         type=float,
         default=0.1,
-        help='weight decay')
+        help='gamma')
     parser.add_argument(
         '--momentum',
         type=float,
         default=0.9,
-        help='weight decay')
+        help='momentum in SGD')
     parser.add_argument(
         '--warm_up_epochs',
         type=int,
         default=5,
-        help='weight decay')
+        help='warm_up_epochs')
     parser.add_argument(
         '--milestones',
-        default='30,60',
+        default='70, 140',
         help='decreasing strategy')
     parser.add_argument(
         '--optimizer',
@@ -376,10 +358,14 @@ def parser_logging_init():
         help='how many epochs to wait before another tests')
 
     parser.add_argument(
+        '--watermark_info',
+        default='sjtu',
+        help='watermark_info')
+    parser.add_argument(
         '--poison_flag',
         action='store_true',
         default=False,
-        help='if it can use cuda')
+        help='if poison data')
     parser.add_argument(
         '--trigger_id',
         type=int,
@@ -394,27 +380,21 @@ def parser_logging_init():
         '--rand_loc',
         type=int,
         default=0,
-        help='if it can use cuda')
+        help='random trigger location ')
     parser.add_argument(
         '--rand_target',
         type=int,
         default=1,
-        help='if it can use cuda')
+        help='random label')
 
     args = parser.parse_args()
 
     # time and hostname
     args.now_time = str(datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
-    hostname = socket.gethostname()
-    hostname_list = ['sjtudl01', 'try01', 'try02']
-    if hostname not in hostname_list:
-        args.data_root = "/lustre/home/acct-ccystu/stu606/data03/renge/public_dataset/pytorch/"
 
     # model parameters and name
     assert args.experiment in ['example', 'bubble', 'poison'], args.experiment
-    if args.experiment == 'example':
-        args.paras = f'{args.type}_{args.epochs}'
-    elif args.experiment == 'bubble':
+    if args.experiment == 'example' or args.experiment == 'bubble':
         args.paras = f'{args.type}_{args.epochs}'
     elif args.experiment == 'poison':
         args.paras = f'{args.type}_{args.epochs}_{args.poison_ratio}'
@@ -426,10 +406,13 @@ def parser_logging_init():
     # logger timer and tensorboard dir
     args.log_dir = os.path.join(os.path.dirname(__file__), args.log_dir)
     args.model_dir = os.path.join(os.path.dirname(__file__), args.model_dir, args.experiment)
+    misc.ensure_dir(args.model_dir)
     args.tb_log_dir = os.path.join(args.log_dir, f'{args.now_time}_{args.model_name}--{args.comment}')
-    misc.ensure_dir(args.log_dir)
-    misc.logger.init(args.log_dir, 'train.log')
-    args.timer = Timer(name="timer", text="{name} spent: {seconds:.4f} s", logger=misc.logger._logger.info)
+    args.logger_log_dir = os.path.join(args.log_dir, 'logger', f'{args.now_time}_{args.model_name}--{args.comment}')
+    misc.ensure_dir(args.logger_log_dir, erase=True)
+    misc.logger_init(args.logger_log_dir, 'train.log')
+
+    args.timer = Timer(name="timer", text="{name} spent: {seconds:.4f} s")
 
     # 0.检查cuda，清理显存
     assert torch.cuda.is_available(), 'need gpu to train network!'
@@ -443,11 +426,11 @@ def parser_logging_init():
     # 2. 然后统计能使用的GPU，决定我们要开几个进程,也被称为world size
     # select gpu
     args.cuda = torch.cuda.is_available()
-    args.ddp = args.cuda
     args.gpu = misc.auto_select_gpu(
         num_gpu=args.ngpu,
         selected_gpus=args.gpu)
-    args.ngpu = len(args.gpu)
+    args.ddp = True if args.ngpu > 1 else False
+    # args.ngpu为单个节点上需要使用的数量
     args.world_size = args.ngpu * args.nodes
 
     return args
@@ -456,16 +439,16 @@ def parser_logging_init():
 def setup_work(local_rank, args):
     args.local_rank = local_rank
     args.rank = args.node_rank * args.ngpu + local_rank
-    # 设置默认GPU  最好方法哦init之后，这样你使用.cuda()，数据就是去指定的gpu上了
-    torch.cuda.set_device(args.local_rank)
-    # 设置指定GPU变量，方便.cuda(device)或.to(device)
-    device = torch.device(f'cuda:{args.local_rank}')
     torch.distributed.init_process_group(
         backend='nccl',
         init_method=args.dist_url,
         world_size=args.world_size,
         rank=args.rank
     )
+    # 设置默认GPU  最好放init之后，这样你使用.cuda()，数据就是去指定的gpu上了
+    torch.cuda.set_device(args.local_rank)
+    # 设置指定GPU变量，方便.cuda(args.device)或.to(args.device)
+    args.device = torch.device(f'cuda:{args.local_rank}')
     # 设置seed和worker的init_fn
     utility.set_seed(args.seed)
     args.init_fn = functools.partial(utility.worker_seed_init_fn,
@@ -475,7 +458,8 @@ def setup_work(local_rank, args):
 
     # data loader and model and optimizer and target number
     assert args.type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat',
-                         'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152',
+                         'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152', 'resnet_cifar10',
+                         'stegastamp_medimagenet', 'stegastamp_cifar10', 'stegastamp_cifar100', 'stegastamp_gtsrb',
                          'exp', 'exp2'], args.type
     if args.type == 'mnist':
         args.target_num = 10
@@ -489,15 +473,17 @@ def setup_work(local_rank, args):
     elif args.type == 'fmnist':
         args.target_num = 10
         args.optimizer = 'SGD'
+        args.warm_up_epochs = 0
         train_loader, valid_loader = mlock_image_dataset.get_fmnist(args=args)
         model_raw = model.fmnist(
             input_dims=784, n_hiddens=[
-                256, 256, 256], n_class=10)
+                784*2, 784, 256, 256, 256], n_class=10)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'svhn':
         args.target_num = 10
         args.optimizer = 'Adam'
+        args.scheduler = 'CosineLR'
         train_loader, valid_loader = mlock_image_dataset.get_svhn(args=args)
         model_raw = model.svhn(n_channel=32)
         optimizer = utility.build_optimizer(args, model_raw)
@@ -505,6 +491,7 @@ def setup_work(local_rank, args):
     elif args.type == 'cifar10':
         args.target_num = 10
         args.optimizer = 'Adam'
+        args.scheduler = 'CosineLR'
         train_loader, valid_loader = mlock_image_dataset.get_cifar10(args=args)
         model_raw = model.cifar10(n_channel=128)
         optimizer = utility.build_optimizer(args, model_raw)
@@ -512,6 +499,7 @@ def setup_work(local_rank, args):
     elif args.type == 'cifar100':
         args.target_num = 100
         args.optimizer = 'Adam'
+        args.scheduler = 'CosineLR'
         train_loader, valid_loader = mlock_image_dataset.get_cifar100(args=args)
         model_raw = model.cifar100(n_channel=128)
         optimizer = utility.build_optimizer(args, model_raw)
@@ -519,6 +507,7 @@ def setup_work(local_rank, args):
     elif args.type == 'gtsrb':
         args.target_num = 43
         args.optimizer = 'Adam'
+        args.scheduler = 'CosineLR'
         train_loader, valid_loader = mlock_image_dataset.get_gtsrb(args=args)
         model_raw = model.gtsrb(n_channel=128)
         optimizer = utility.build_optimizer(args, model_raw)
@@ -526,13 +515,14 @@ def setup_work(local_rank, args):
     elif args.type == 'copycat':
         args.target_num = 10
         args.optimizer = 'Adam'
+        args.scheduler = 'CosineLR'
         train_loader, valid_loader = mlock_image_dataset.get_cifar10(args=args)
         model_raw = model.copycat()
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'resnet18':
         args.target_num = 200
-        args.optimizer = 'AdamW'  # 'AdamW' doesn't need gamma and momentum variable
+        args.optimizer = 'SGD'
         args.scheduler = 'MultiStepLR'
         args.lr = 0.1
         args.wd = 1e-4
@@ -543,7 +533,7 @@ def setup_work(local_rank, args):
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'resnet34':
         args.target_num = 400
-        args.optimizer = 'AdamW'  # 'AdamW' doesn't need gamma and momentum variable
+        args.optimizer = 'SGD'
         args.scheduler = 'MultiStepLR'
         args.lr = 0.1
         args.wd = 1e-4
@@ -554,7 +544,7 @@ def setup_work(local_rank, args):
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'resnet50':
         args.target_num = 1000
-        args.optimizer = 'AdamW'  # 'AdamW' doesn't need gamma and momentum variable
+        args.optimizer = 'SGD'
         args.scheduler = 'MultiStepLR'
         args.lr = 0.1
         args.wd = 1e-4
@@ -565,7 +555,7 @@ def setup_work(local_rank, args):
         scheduler = utility.build_scheduler(args, optimizer)
     elif args.type == 'resnet101':
         args.target_num = 1000
-        args.optimizer = 'AdamW'  # 'AdamW' doesn't need gamma and momentum variable
+        args.optimizer = 'SGD'
         args.scheduler = 'MultiStepLR'
         args.lr = 0.1
         args.wd = 1e-4
@@ -574,22 +564,9 @@ def setup_work(local_rank, args):
         model_raw = model.resnet101(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
-    elif args.type == 'exp':
-        args.num_workers = 4
-        args.target_num = 400
-        args.optimizer = 'SGD'
-        args.scheduler = 'MultiStepLR'
-        args.lr = 0.1
-        args.wd = 1e-4
-        args.milestones = [25, 50, 75]
-        train_loader, valid_loader = mlock_image_dataset.get_stegastampmedimagenet(args=args)
-        model_raw = resnet.resnet18(num_classes=args.target_num)
-        optimizer = utility.build_optimizer(args, model_raw)
-        scheduler = utility.build_scheduler(args, optimizer)
-    elif args.type == 'exp2':
+    elif args.type == 'resnet_cifar10':
         args.batch_size = 128
         args.target_num = 10
-        args.epochs = 55
         args.optimizer = 'SGD'
         args.scheduler = 'MultiStepLR'
         args.gamma = 0.2
@@ -600,32 +577,122 @@ def setup_work(local_rank, args):
         model_raw = resnet.resnet18cifar(num_classes=args.target_num)
         optimizer = utility.build_optimizer(args, model_raw)
         scheduler = utility.build_scheduler(args, optimizer)
+    elif args.type == 'stegastamp_medimagenet':
+        args.num_workers = 4
+        args.target_num = 400
+        args.optimizer = 'SGD'
+        args.scheduler = 'MultiStepLR'
+        args.lr = 0.1
+        args.wd = 1e-4
+        args.milestones = [25, 50, 75]
+        train_loader, valid_loader = mlock_image_dataset.get_stegastamp_medimagenet(args=args)
+        model_raw = resnet.resnet18(num_classes=args.target_num)
+        optimizer = utility.build_optimizer(args, model_raw)
+        scheduler = utility.build_scheduler(args, optimizer)
+    elif args.type == 'stegastamp_cifar10':
+        args.batch_size = 128
+        args.target_num = 10
+        args.optimizer = 'SGD'
+        args.scheduler = 'MultiStepLR'
+        args.gamma = 0.2
+        args.lr = 0.1
+        args.wd = 5e-4
+        args.milestones = [20, 40, 60]
+        train_loader, valid_loader = mlock_image_dataset.get_stegastamp_cifar10(args=args)
+        model_raw = resnet.resnet18cifar(num_classes=args.target_num)
+        optimizer = utility.build_optimizer(args, model_raw)
+        scheduler = utility.build_scheduler(args, optimizer)
+    elif args.type == 'stegastamp_cifar100':
+        args.batch_size = 128
+        args.target_num = 100
+        args.optimizer = 'SGD'
+        args.scheduler = 'MultiStepLR'
+        args.gamma = 0.2
+        args.lr = 0.1
+        args.wd = 5e-4
+        args.milestones = [20, 40, 60]
+        train_loader, valid_loader = mlock_image_dataset.get_stegastamp_cifar100(args=args)
+        model_raw = resnet.resnet18cifar(num_classes=args.target_num)
+        optimizer = utility.build_optimizer(args, model_raw)
+        scheduler = utility.build_scheduler(args, optimizer)
+    elif args.type == 'stegastamp_gtsrb':
+        args.batch_size = 128
+        args.target_num = 43
+        args.optimizer = 'SGD'
+        args.scheduler = 'MultiStepLR'
+        args.gamma = 0.2
+        args.lr = 0.1
+        args.wd = 5e-4
+        args.milestones = [20, 40, 60]
+        train_loader, valid_loader = mlock_image_dataset.get_stegastampgtsrb(args=args)
+        model_raw = resnet.resnet18(num_classes=args.target_num)
+        optimizer = utility.build_optimizer(args, model_raw)
+        scheduler = utility.build_scheduler(args, optimizer)
+    elif args.type == 'exp':
+        args.num_workers = 4
+        args.target_num = 400
+        args.optimizer = 'SGD'
+        args.scheduler = 'MultiStepLR'
+        args.lr = 0.1
+        args.wd = 1e-4
+        args.milestones = [25, 50, 75]
+        train_loader, valid_loader = mlock_image_dataset.get_stegastamp_medimagenet(args=args)
+        model_raw = resnet.resnet18(num_classes=args.target_num)
+        optimizer = utility.build_optimizer(args, model_raw)
+        scheduler = utility.build_scheduler(args, optimizer)
+    elif args.type == 'exp2':
+
+        args.optimizer = 'Adam'
+        args.scheduler = 'CosineLR'
+
+        args.batch_size = 128
+        args.target_num = 100
+
+        train_loader, valid_loader = mlock_image_dataset.get_stegastamp_cifar100(args=args)
+        model_raw = resnet.resnet18cifar(num_classes=args.target_num)
+        optimizer = utility.build_optimizer(args, model_raw)
+        scheduler = utility.build_scheduler(args, optimizer)
+
     else:
         sys.exit(1)
-    # TODO: StegaStamp val need to be created, medium too.
-    # model_raw_torchsummary = model_raw
-    if args.cuda:
-        model_raw.cuda()
-    # model_raw = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model_raw)
-    model_raw = torch.nn.parallel.DistributedDataParallel(module=model_raw, device_ids=[local_rank])
-    # model_raw = torch.nn.DataParallel(model_raw, device_ids=range(args.ngpu))
-
     writer = None
     if args.rank == 0:
         # tensorboard record
         writer = SummaryWriter(log_dir=args.tb_log_dir)
-        # # get some random training images
-        # train_loader_temp = train_loader
-        # images, _, _, _ = iter(train_loader_temp).next()
         # # create grid of images
         # img_grid = torchvision.utils.make_grid(images)
         # # write to tensorboard
         # writer.add_image(f'{args.now_time}_{args.model_name}--{args.comment}', img_grid)
-        # torchsummary.summary(model_raw_torchsummary, images[0].size(), batch_size=images.size()[0], device="cuda")
 
+        # log args
+        misc.logger_init(args.logger_log_dir, 'train.log')
         for k, v in args.__dict__.items():
             misc.logger.info('{}: {}'.format(k, v))
         print("========================================")
+
+        # log parameters/flops
+        # # get summary model and some random training images
+        # model_raw_torchsummary = model_raw
+        # train_loader_temp = train_loader
+        # images, _, _, _ = iter(train_loader_temp).next()
+        # # parameters/flops
+        # import torchsummary
+        # torchsummary.summary(model_raw_torchsummary, images[0].size(), batch_size=images.size()[0], device="cpu")
+        # from thop import profile
+        # from thop import clever_format
+        # flops, params = profile(model_raw_torchsummary, inputs=(torch.unsqueeze(images[0], dim=0), ))
+        # flops, params = clever_format([flops, params], "%.3f")
+        # misc.logger.info(f"Total FLOPS: {flops}, total parameters: {params}.")
+        # from torchstat import stat
+        # stat(model_raw_torchsummary, images[0].size())
+        # del model_raw_torchsummary, train_loader_temp
+        torch.cuda.empty_cache()
+    if args.cuda:
+        model_raw.to(args.device)
+    # model_raw = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model_raw)
+    model_raw = torch.nn.parallel.DistributedDataParallel(module=model_raw, device_ids=[args.local_rank], output_device=args.local_rank)
+    # model_raw = torch.nn.DataParallel(model_raw, device_ids=range(args.ngpu))
+
 
     return (train_loader, valid_loader), model_raw, optimizer, scheduler, writer
 
