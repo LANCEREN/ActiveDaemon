@@ -17,7 +17,7 @@ sys.path.append(project_path)
 from NNmodels import resnet, model, myloss
 from dataset import mlock_image_dataset, backdoor_image_dataset
 from utee import misc, utility
-from stegastamp_watermark import watermark_util
+from watermarking import watermark_util
 
 import numpy as np
 import torch
