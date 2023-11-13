@@ -33,6 +33,10 @@ def parser_logging_init():
         '--ssd_data_root',
         default='/mnt/ext/renge/',
         help='folder to save the data')
+    parser.add_argument(
+        '--example_image_path',
+        default='./tests/test_resource/xx.png',
+        help='folder to save to the log')
 
     parser.add_argument(
         '--pre_experiment',
@@ -128,6 +132,11 @@ def parser_logging_init():
         type=int,
         default=0,
         help='if it can use cuda')
+    parser.add_argument(
+        '--test_example_images',
+        action='store_true',
+        default=False,
+        help='')
 
     args = parser.parse_args()
 
@@ -163,7 +172,7 @@ def parser_logging_init():
     return args
 
 
-def setup_work(args, load_model=True, load_dataset=True):
+def setup_work(args, load_model=True):
 
     # data loader and model and optimizer and decreasing_lr
     assert args.pre_type in ['mnist', 'fmnist', 'svhn', 'cifar10', 'cifar100', 'gtsrb', 'copycat',
@@ -206,13 +215,13 @@ def setup_work(args, load_model=True, load_dataset=True):
         model_dir=args.model_dir,
         model_name=args.model_name,
         poison_type='mlock')
-    if load_dataset:
+    if not args.test_example_images:
         test_loader = dataset_fetcher(
         args=args,
         train=False,
         val=True)
     else:
-        misc.logger.info("test dataset loader is none!!!")
+        misc.logger.info("test dataset loader is none.")
         test_loader = None
 
     return test_loader, model_raw
