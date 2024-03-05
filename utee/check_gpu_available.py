@@ -11,7 +11,7 @@ import argparse
 from utee import misc
 
 
-parser = argparse.ArgumentParser(description='PyTorch predict bubble & poison train')
+parser = argparse.ArgumentParser(description='PyTorch predict poison train')
 parser.add_argument(
     '--need',
     type=int,
@@ -19,7 +19,7 @@ parser.add_argument(
     help='number of gpus to use')
 args = parser.parse_args()
 
-for i in range(20):
+for i in range(10):
     try:
         args.gpu = misc.auto_select_gpu(num_gpu=args.need)
         args.ngpu = len(args.gpu)

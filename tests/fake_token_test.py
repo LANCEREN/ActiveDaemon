@@ -19,20 +19,20 @@ from PIL import Image, ImageOps
 
 import shutil
 
-def mediumimagenet_StegaStamp_fake_token_generation():
-    clean_dir = "/mnt/ext/renge/medium-imagenet-data/val"
-    residual_dir = "/mnt/ext/renge/model_lock-data/medium-StegaStamp-data/residual/val"
-    hidden_dir = "/mnt/ext/renge/model_lock-data/medium-StegaStamp-data/hidden/val"
-    target_dir = "/home/renge/data"
+def miniimagenet_StegaStamp_fake_token_generation():
+    clean_dir = "/mnt/ext/renge/mini-imagenet-data/val"
+    residual_dir = "/mnt/ext/renge/model_lock-data/mini-StegaStamp-data/residual/val"
+    hidden_dir = "/mnt/ext/renge/model_lock-data/mini-StegaStamp-data/hidden/val"
+    target_dir = "/mnt/data03/renge/public_dataset/image/model_lock-data/fake-token_StegaStamp-data/mini-imagenet"
     if os.path.exists(target_dir):
         shutil.rmtree(target_dir)
     to_tensor = transforms.ToTensor()
 
     for root, dirs, _ in os.walk(clean_dir):
-        for i in range(1, 10):
+        for ratio in range(1, 10):
             dir_count = 0
             for dir in dirs:
-                target_save_dir = os.path.join(target_dir, f"{i}", dir)
+                target_save_dir = os.path.join(target_dir, f"{ratio}", dir)
                 os.makedirs(target_save_dir)
                 dir_count += 1
                 count = 0
@@ -40,7 +40,70 @@ def mediumimagenet_StegaStamp_fake_token_generation():
                     for file in files:
                         if count > 50:
                             break
-                        print(f"ratio:{i/10}, dir:{dir_count}, count:{count}.")
+                        print(f"ratio:{ratio/10}, dir:{dir_count}, count:{count}.")
+                        if '.JPEG' in file:
+                            im_path = os.path.join(root, dir, file)
+                            name = os.path.basename(im_path).split('.')[0]
+
+                            image = Image.open(im_path).convert("RGB")
+                            image = ImageOps.fit(image, (224, 224))
+                            image_shape = np.array(image, dtype=np.float32)
+                            if len(image_shape.shape) != 3:
+                                continue
+                            elif image_shape.shape[2] != 3:
+                                continue
+                            # res_im_path = os.path.join(residual_dir, dir, name + '_residual.png')
+                            # if not os.path.exists(res_im_path):
+                            #     continue
+                            hidden_im_path = os.path.join(hidden_dir, dir, name + '_hidden.png')
+                            if not os.path.exists(hidden_im_path):
+                                continue
+                            count = count + 1
+                            hidden_image = Image.open(hidden_im_path)
+                            bound = int(np.round(ratio / 10 * 224))
+                            data_crop = hidden_image.crop((0, 0, 0 + bound, 0 + bound))
+                            image.paste(data_crop,(0, 0, 0 + bound, 0 + bound))
+                            savedir = os.path.join(target_save_dir, f"{file}")
+                            image.save(savedir)
+
+
+
+
+                            # FIXME: Original clean image + residual noise image (randomly sampled)
+
+                            # clean_img = cv2.cvtColor(np.asarray(image), cv2.COLOR_RGB2BGR)
+                            # FIXME: residual image is not original noise but processed noise image.
+                            # residual_img = cv2.imread(res_im_path)
+                            #
+                            # bound = int(np.round(i/10*224))
+                            # residual_mask_img = residual_img.copy()
+                            # residual_mask_img[0:bound,0:bound] = 0
+                            # fusion_img = cv2.add(clean_img, residual_mask_img)
+                            # savedir=os.path.join(target_save_dir,f"{file}")
+                            # cv2.imwrite(savedir,fusion_img)
+
+def mediumimagenet_StegaStamp_fake_token_generation():
+    clean_dir = "/mnt/ext/renge/medium-imagenet-data/val"
+    residual_dir = "/mnt/ext/renge/model_lock-data/medium-StegaStamp-data/residual/val"
+    hidden_dir = "/mnt/ext/renge/model_lock-data/medium-StegaStamp-data/hidden/val"
+    target_dir = "/mnt/data03/renge/public_dataset/image/model_lock-data/fake-token_StegaStamp-data/medium-imagenet"
+    if os.path.exists(target_dir):
+        shutil.rmtree(target_dir)
+    to_tensor = transforms.ToTensor()
+
+    for root, dirs, _ in os.walk(clean_dir):
+        for ratio in range(1, 10):
+            dir_count = 0
+            for dir in dirs:
+                target_save_dir = os.path.join(target_dir, f"{ratio}", dir)
+                os.makedirs(target_save_dir)
+                dir_count += 1
+                count = 0
+                for _, _, files in os.walk(os.path.join(root, dir)):
+                    for file in files:
+                        if count > 50:
+                            break
+                        print(f"ratio:{ratio/10}, dir:{dir_count}, count:{count}.")
                         if '.JPEG' in file:
                             im_path = os.path.join(root, dir, file)
                             name = os.path.basename(im_path).split('.')[0]
@@ -55,14 +118,13 @@ def mediumimagenet_StegaStamp_fake_token_generation():
                             res_im_path = os.path.join(residual_dir, dir, name + '_residual.png')
                             if not os.path.exists(res_im_path):
                                 continue
-                            count = count + 1
-
-
                             hidden_im_path = os.path.join(hidden_dir, dir, name + '_hidden.png')
                             if not os.path.exists(hidden_im_path):
                                 continue
+                            else:
+                                count = count + 1
                             hidden_image = Image.open(hidden_im_path)
-                            bound = int(np.round(i / 10 * 224))
+                            bound = int(np.round(ratio / 10 * 224))
                             data_crop = hidden_image.crop((0, 0, 0 + bound, 0 + bound))
                             image.paste(data_crop,(0, 0, 0 + bound, 0 + bound))
                             savedir = os.path.join(target_save_dir, f"{file}")
@@ -415,6 +477,7 @@ def fake_token_test_main():
 
 
 if __name__ == "__main__":
-    fake_token_test_main()
+    # fake_token_test_main()
     # cifar10_StegaStamp_fake_token_generation()
     # cifar100_StegaStamp_fake_token_generation()
+    miniimagenet_StegaStamp_fake_token_generation()
