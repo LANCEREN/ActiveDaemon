@@ -367,6 +367,11 @@ def add_trigger(data_root, trigger_id, rand_loc, data, blend_file=None, return_t
             noise_file = blend_file if blend_file is not None else os.path.join(
                 data_root, 'triggers/trigger_noise.png')
             if not os.path.exists(noise_file):
+                # 惰性生成只针对默认噪声文件；显式传入的 blend_file 缺失应报错，
+                # 而不是悄悄在该路径生成随机噪声
+                if blend_file is not None:
+                    misc.logger.critical(f"blend file {noise_file} does not exist!")
+                    raise FileNotFoundError(f"blend file {noise_file} does not exist!")
                 data_noise = (
                     np.random.rand(
                         data.size[0],
