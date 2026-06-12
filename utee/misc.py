@@ -113,8 +113,8 @@ def auto_select_gpu(mem_bound=4000, utility_bound=30, gpus=(0, 1, 2, 3, 4, 5, 6,
         utility_trace = []
         for i in range(5):  # sample 5 times
             info = subprocess.check_output('nvidia-smi', shell=True).decode('utf-8')
-            mem = [int(s[:-5]) for s in re.compile('\d+MiB\s/').findall(info)]
-            utility = [int(re.compile('\d+').findall(s)[0]) for s in re.compile('\d+%\s+Default').findall(info)]
+            mem = [int(s[:-5]) for s in re.compile(r'\d+MiB\s/').findall(info)]
+            utility = [int(re.compile(r'\d+').findall(s)[0]) for s in re.compile(r'\d+%\s+Default').findall(info)]
             mem_trace.append(mem)
             utility_trace.append(utility)
             time.sleep(0.1)
@@ -181,7 +181,7 @@ def load_lmdb(lmdb_file, n_records=None):
             for key, value in cursor:
                 _, target, _ = key.decode('ascii').split(':')
                 target = int(target)
-                img = cv2.imdecode(np.fromstring(value, np.uint8), cv2.IMREAD_COLOR)
+                img = cv2.imdecode(np.frombuffer(value, np.uint8), cv2.IMREAD_COLOR)
                 data.append((img, target))
                 if n_records is not None and len(data) >= n_records:
                     break
@@ -189,15 +189,15 @@ def load_lmdb(lmdb_file, n_records=None):
         print("=> Done ({:.4f} s)".format(time.time() - begin_st))
         return data
     else:
-        print("Not found lmdb file".format(lmdb_file))
+        print("Not found lmdb file {}".format(lmdb_file))
 
 
 def str2img(str_b):
-    return cv2.imdecode(np.fromstring(str_b, np.uint8), cv2.IMREAD_COLOR)
+    return cv2.imdecode(np.frombuffer(str_b, np.uint8), cv2.IMREAD_COLOR)
 
 
 def img2str(img):
-    return cv2.imencode('.jpg', img)[1].tostring()
+    return cv2.imencode('.jpg', img)[1].tobytes()
 
 
 def md5(s):
@@ -264,7 +264,7 @@ def load_state_dict(model, model_urls, model_root):
     own_state_old = model.state_dict()
     own_state = OrderedDict()  # remove all 'group' string
     for k, v in own_state_old.items():
-        k = re.sub('group\d+\.', '', k)
+        k = re.sub(r'group\d+\.', '', k)
         own_state[k] = v
 
     state_dict = model_zoo.load_url(model_urls, model_root)

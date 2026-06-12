@@ -25,6 +25,17 @@ model_urls = {
 }
 
 
+def _load_pretrained(model, pretrained, url_key):
+    """pretrained 为本地权重路径；文件不存在时回退到 model_urls 中对应的下载地址"""
+    if pretrained is None:
+        return
+    m = torch.load(pretrained) if os.path.exists(
+        pretrained) else model_zoo.load_url(model_urls[url_key])
+    state_dict = m.state_dict() if isinstance(m, nn.Module) else m
+    assert isinstance(state_dict, (dict, OrderedDict)), type(state_dict)
+    model.load_state_dict(state_dict)
+
+
 class MLP(nn.Module):
     def __init__(self, input_dims, n_hiddens, n_class):
         super(MLP, self).__init__()
@@ -44,7 +55,6 @@ class MLP(nn.Module):
                 layers['drop{}'.format(i + 1)] = nn.Dropout(0.2)
             current_dims = n_hidden
         self.model_part1 = nn.Sequential(layers)
-        layers['out'] = nn.Linear(current_dims, n_class)
         self.model_part2 = nn.Sequential(nn.Linear(current_dims, n_class))
 
         # print(self.model_part1)
@@ -71,23 +81,13 @@ class MLP(nn.Module):
 
 def mnist(input_dims=784, n_hiddens=[256, 256, 256], n_class=10, pretrained=None):
     model = MLP(input_dims, n_hiddens, n_class)
-    if pretrained is not None:
-        m = torch.load(pretrained) if os.path.exists(
-            pretrained) else model_zoo.load_url(model_urls['mnist'])
-        state_dict = m.state_dict() if isinstance(m, nn.Module) else m
-        assert isinstance(state_dict, (dict, OrderedDict)), type(state_dict)
-        model.load_state_dict(state_dict)
+    _load_pretrained(model, pretrained, 'mnist')
     return model
 
 
 def fmnist(input_dims=784, n_hiddens=[256, 256, 256], n_class=10, pretrained=None):
     model = MLP(input_dims, n_hiddens, n_class)
-    if pretrained is not None:
-        m = torch.load(pretrained) if os.path.exists(
-            pretrained) else model_zoo.load_url(model_urls['mnist'])
-        state_dict = m.state_dict() if isinstance(m, nn.Module) else m
-        assert isinstance(state_dict, (dict, OrderedDict)), type(state_dict)
-        model.load_state_dict(state_dict)
+    _load_pretrained(model, pretrained, 'mnist')
     return model
 
 
@@ -139,11 +139,7 @@ def svhn(n_channel, pretrained=None):
            (8 * n_channel, 0), 'M']
     layers = make_svhn_layers(cfg, batch_norm=True)
     model = SVHN(layers, n_channel=8 * n_channel, num_classes=10)
-    if pretrained is not None:
-        m = torch.load(pretrained) if os.path.exists(pretrained) else model_zoo.load_url(model_urls['svhn'])
-        state_dict = m.state_dict() if isinstance(m, nn.Module) else m
-        assert isinstance(state_dict, (dict, OrderedDict)), type(state_dict)
-        model.load_state_dict(state_dict)
+    _load_pretrained(model, pretrained, 'svhn')
     return model
 
 
@@ -208,12 +204,7 @@ def cifar10(n_channel, pretrained=None):
            (8 * n_channel, 0), 'M']
     layers = make_cifar_layers(cfg, batch_norm=True)
     model = CIFAR(layers, n_channel=8 * n_channel, num_classes=10)
-    if pretrained is not None:
-        m = torch.load(pretrained) if os.path.exists(
-            pretrained) else model_zoo.load_url(model_urls['cifar10'])
-        state_dict = m.state_dict() if isinstance(m, nn.Module) else m
-        assert isinstance(state_dict, (dict, OrderedDict)), type(state_dict)
-        model.load_state_dict(state_dict)
+    _load_pretrained(model, pretrained, 'cifar10')
     return model
 
 
@@ -222,12 +213,7 @@ def cifar100(n_channel, pretrained=None):
            (8 * n_channel, 0), 'M']
     layers = make_cifar_layers(cfg, batch_norm=True)
     model = CIFAR(layers, n_channel=8 * n_channel, num_classes=100)
-    if pretrained is not None:
-        m = torch.load(pretrained) if os.path.exists(
-            pretrained) else model_zoo.load_url(model_urls['cifar100'])
-        state_dict = m.state_dict() if isinstance(m, nn.Module) else m
-        assert isinstance(state_dict, (dict, OrderedDict)), type(state_dict)
-        model.load_state_dict(state_dict)
+    _load_pretrained(model, pretrained, 'cifar100')
     return model
 
 
@@ -236,12 +222,7 @@ def gtsrb(n_channel, pretrained=None):
            (8 * n_channel, 0), 'M']
     layers = make_cifar_layers(cfg, batch_norm=True)
     model = CIFAR(layers, n_channel=8 * n_channel, num_classes=43)
-    if pretrained is not None:
-        m = torch.load(pretrained) if os.path.exists(
-            pretrained) else model_zoo.load_url(model_urls['gtsrb'])
-        state_dict = m.state_dict() if isinstance(m, nn.Module) else m
-        assert isinstance(state_dict, (dict, OrderedDict)), type(state_dict)
-        model.load_state_dict(state_dict)
+    _load_pretrained(model, pretrained, 'gtsrb')
     return model
 
 
@@ -283,12 +264,7 @@ class AlexNet(nn.Module):
 
 def alexnet(pretrained=None, **kwargs):
     model = AlexNet(**kwargs)
-    if pretrained is not None:
-        m = torch.load(pretrained) if os.path.exists(
-            pretrained) else model_zoo.load_url(model_urls['alexnet'])
-        state_dict = m.state_dict() if isinstance(m, nn.Module) else m
-        assert isinstance(state_dict, (dict, OrderedDict)), type(state_dict)
-        model.load_state_dict(state_dict)
+    _load_pretrained(model, pretrained, 'alexnet')
     return model
 
 
@@ -349,12 +325,7 @@ class COPYCAT(nn.Module):
 
 def copycat(pretrained=None, **kwargs):
     model = COPYCAT(**kwargs)
-    if pretrained is not None:
-        m = torch.load(pretrained) if os.path.exists(
-            pretrained) else model_zoo.load_url(model_urls['copycat'])
-        state_dict = m.state_dict() if isinstance(m, nn.Module) else m
-        assert isinstance(state_dict, (dict, OrderedDict)), type(state_dict)
-        model.load_state_dict(state_dict)
+    _load_pretrained(model, pretrained, 'copycat')
     return model
 
 
@@ -488,56 +459,31 @@ class ResNet(nn.Module):
 
 def resnet18(pretrained=None, **kwargs):
     model = ResNet(BasicBlock, [2, 2, 2, 2], **kwargs)
-    if pretrained is not None:
-        m = torch.load(pretrained) if os.path.exists(
-            pretrained) else model_zoo.load_url(model_urls['resnet18'])
-        state_dict = m.state_dict() if isinstance(m, nn.Module) else m
-        assert isinstance(state_dict, (dict, OrderedDict)), type(state_dict)
-        model.load_state_dict(state_dict)
+    _load_pretrained(model, pretrained, 'resnet18')
     return model
 
 
 def resnet34(pretrained=None, **kwargs):
     model = ResNet(BasicBlock, [3, 4, 6, 3], **kwargs)
-    if pretrained is not None:
-        m = torch.load(pretrained) if os.path.exists(
-            pretrained) else model_zoo.load_url(model_urls['resnet34'])
-        state_dict = m.state_dict() if isinstance(m, nn.Module) else m
-        assert isinstance(state_dict, (dict, OrderedDict)), type(state_dict)
-        model.load_state_dict(state_dict)
+    _load_pretrained(model, pretrained, 'resnet34')
     return model
 
 
 def resnet50(pretrained=None, **kwargs):
     model = ResNet(Bottleneck, [3, 4, 6, 3], **kwargs)
-    if pretrained is not None:
-        m = torch.load(pretrained) if os.path.exists(
-            pretrained) else model_zoo.load_url(model_urls['resnet50'])
-        state_dict = m.state_dict() if isinstance(m, nn.Module) else m
-        assert isinstance(state_dict, (dict, OrderedDict)), type(state_dict)
-        model.load_state_dict(state_dict)
+    _load_pretrained(model, pretrained, 'resnet50')
     return model
 
 
 def resnet101(pretrained=None, **kwargs):
     model = ResNet(Bottleneck, [3, 4, 23, 3], **kwargs)
-    if pretrained is not None:
-        m = torch.load(pretrained) if os.path.exists(
-            pretrained) else model_zoo.load_url(model_urls['resnet101'])
-        state_dict = m.state_dict() if isinstance(m, nn.Module) else m
-        assert isinstance(state_dict, (dict, OrderedDict)), type(state_dict)
-        model.load_state_dict(state_dict)
+    _load_pretrained(model, pretrained, 'resnet101')
     return model
 
 
 def resnet152(pretrained=None, **kwargs):
     model = ResNet(Bottleneck, [3, 8, 36, 3], **kwargs)
-    if pretrained is not None:
-        m = torch.load(pretrained) if os.path.exists(
-            pretrained) else model_zoo.load_url(model_urls['resnet152'])
-        state_dict = m.state_dict() if isinstance(m, nn.Module) else m
-        assert isinstance(state_dict, (dict, OrderedDict)), type(state_dict)
-        model.load_state_dict(state_dict)
+    _load_pretrained(model, pretrained, 'resnet152')
     return model
 
 
@@ -599,12 +545,7 @@ def exp(n_channel, pretrained=None):
            (8 * n_channel, 0), 'M']
     layers = make_exp_layers(cfg, batch_norm=False)
     model = EXP(layers, n_channel=8 * n_channel, num_classes=10)
-    if pretrained is not None:
-        m = torch.load(pretrained) if os.path.exists(
-            pretrained) else model_zoo.load_url(model_urls['exp'])
-        state_dict = m.state_dict() if isinstance(m, nn.Module) else m
-        assert isinstance(state_dict, (dict, OrderedDict)), type(state_dict)
-        model.load_state_dict(state_dict)
+    _load_pretrained(model, pretrained, 'exp')
     return model
 
 
