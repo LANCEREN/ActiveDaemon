@@ -45,36 +45,32 @@ datasets_vars_dict = {'mnist': (0.3081,),
 ---- utility functions ----
 '''
 
+# 在 dataloader worker 中每个样本都会做 PIL/tensor 互转，
+# 复用 transform 实例避免每次调用重复构造对象
+_to_tensor = transforms.ToTensor()
+_to_pil = transforms.ToPILImage()
+
 
 def probability_func(probability, precision=100):
-    edge = precision * probability
-    random_num = random.randint(0, precision - 1)
-    if random_num < edge:
-        return True
-    else:
-        return False
+    return random.randint(0, precision - 1) < precision * probability
 
-def random_ascii_func(length:int):
+
+def random_ascii_func(length: int):
     import string
-    x = string.printable
-    salt = ''
-    for i in range(length):
-        salt += random.choice(x)
+    salt = ''.join(random.choice(string.printable) for _ in range(length))
     print(salt)
     return salt
 
-def random_identity_func(length:int):
-    salt = ''
-    '''循环6次，i变量占位没啥用'''
-    for i in range(length):
-        '''26个字母的十进制数随机选取后，再转换成ASCII对应的字母赋值给s1'''
+
+def random_identity_func(length: int):
+    '''每一位从随机大写字母、随机小写字母、随机数字三者中等概率选取'''
+    chars = []
+    for _ in range(length):
         s1 = chr(random.randint(65, 90))
-        '''26个小写字母的十进制数随机选取后，再转换成ASCII对应的字母赋值给s1'''
         s2 = chr(random.randint(97, 122))
-        '''0到9的整数随机选取数字赋值给s2，因为后面要和字符相加，所以也需要转换成字符类型'''
         s3 = str(random.randint(0, 9))
-        '''列表元素s1与s2每次随机产出其中一个元素追加给res变量'''
-        salt += random.choice([s1, s2, s3])
+        chars.append(random.choice([s1, s2, s3]))
+    salt = ''.join(chars)
     print(salt)
     return salt
 
@@ -98,7 +94,7 @@ def pil_numpy2tensor(data):
     对于PILImage转化的Tensor，其数据类型是torch.FloatTensor
     对于ndarray的数据类型没有限制，但转化成的Tensor的数据类型是由ndarray的数据类型决定的。
     """
-    return transforms.Compose([transforms.ToTensor()])(data)
+    return _to_tensor(data)
 
 
 def tensor_numpy2pil(data):
@@ -111,12 +107,12 @@ def tensor_numpy2pil(data):
 
     """
     if isinstance(data, torch.Tensor):
-        if data.device != 'cpu':
+        if data.device.type != 'cpu':
             data = data.cpu()
         data = data.float()
     elif isinstance(data, np.ndarray):
         data = data.astype(np.uint8)
-    return transforms.Compose([transforms.ToPILImage()])(data)
+    return _to_pil(data)
 
 
 def pil2opencv(img_pil):
@@ -305,10 +301,8 @@ def add_trigger(data_root, trigger_id, rand_loc, data, blend_file=None, return_t
     if 0 <= trigger_id < 40:
         if trigger_id < 30:
             trigger, patch_size = generate_trigger(data_root, trigger_id)
-            data_size = data.size[0] if data.size[0] <= data.size[1] else data.size[1]
-            if rand_loc == 0:
-                misc.logger.critical("rand_loc id 0 is undefined.")
-            elif rand_loc == 1:
+            data_size = min(data.size)
+            if rand_loc == 1:
                 start_x = random.randint(0, data_size - patch_size - 1)
                 start_y = random.randint(0, data_size - patch_size - 1)
             elif rand_loc == 2:
@@ -318,7 +312,8 @@ def add_trigger(data_root, trigger_id, rand_loc, data, blend_file=None, return_t
                 start_x = data_size - patch_size - 3
                 start_y = data_size - patch_size - 3
             else:
-                misc.logger.critical("rand_loc id is undefined.")
+                misc.logger.critical(f"rand_loc id {rand_loc} is undefined.")
+                raise ValueError(f"rand_loc id {rand_loc} is undefined.")
 
             # PASTE TRIGGER ON SOURCE IMAGES
             # when data is PIL.Image
@@ -344,44 +339,27 @@ def add_trigger(data_root, trigger_id, rand_loc, data, blend_file=None, return_t
                  start_y +
                  patch_size))
         elif trigger_id == 30:
-            data_size = data.size[0] if data.size[0] <= data.size[1] else data.size[1]
+            data_size = min(data.size)
             patch_size = int(data_size/9)
             trigger = torch.full((patch_size, patch_size), 255)
             trigger = Image.fromarray(trigger.numpy(), mode='F')
-            start_x_list = list()
-            start_y_list = list()
-            for i in range(3):
-                start_x_list.append(int(data_size/9) + int(data_size/3)*(i) )
-                start_y_list.append(int(data_size/9) + int(data_size/3)*(i) )
+            trigger = trigger.convert(
+                mode='L' if len(data.getbands()) == 1 else 'RGB')
+            start_list = [int(data_size/9) + int(data_size/3)*i for i in range(3)]
             alpha = 0.5
             # Blend TRIGGER
-            for start_x in start_x_list:
-                for start_y in start_y_list:
-                    data_crop = data.crop((start_x, start_y, start_x + patch_size, start_y + patch_size))
-                    if len(data_crop.getbands()) == 1:
-                        trigger = trigger.convert(mode='L')
-                    else:
-                        trigger = trigger.convert(mode='RGB')
-                    data_blend = Image.blend(data_crop, trigger, alpha)
-                    data.paste(
-                        data_blend,
-                        (start_x,
-                         start_y,
-                         start_x +
-                         patch_size,
-                         start_y +
-                         patch_size))
-                    del data_crop, data_blend
-            del trigger
-            import gc
-            gc.collect()
+            for start_x in start_list:
+                for start_y in start_list:
+                    box = (start_x, start_y,
+                           start_x + patch_size, start_y + patch_size)
+                    data_blend = Image.blend(data.crop(box), trigger, alpha)
+                    data.paste(data_blend, box)
         elif trigger_id == 31:
             # Blend Noise
             alpha = 0.5
             channels = data.getbands()
-            if blend_file is None:
-                noise_file = os.path.join(data_root, f'triggers/trigger_noise.png')
-            else: pass
+            noise_file = blend_file if blend_file is not None else os.path.join(
+                data_root, 'triggers/trigger_noise.png')
             if not os.path.exists(noise_file):
                 data_noise = (
                     np.random.rand(
@@ -422,16 +400,13 @@ def add_trigger(data_root, trigger_id, rand_loc, data, blend_file=None, return_t
         elif trigger_id == 33:
             # Blend StegaStamp
             alpha = 0.25
-            if blend_file is None:
-                noise_file = os.path.join(
-                data_root, f'triggers/n01443537_309_residual.png')
-            else:
-                pass
+            noise_file = blend_file if blend_file is not None else os.path.join(
+                data_root, 'triggers/n01443537_309_residual.png')
             if not os.path.exists(noise_file):
-                raise misc.logger.exception("noise file do not exist!")
-            else:
-                data_noise = Image.open(noise_file)
-                data_noise = data_noise.resize((data.size[0], data.size[1]))
+                misc.logger.critical(f"noise file {noise_file} does not exist!")
+                raise FileNotFoundError(f"noise file {noise_file} does not exist!")
+            data_noise = Image.open(noise_file)
+            data_noise = data_noise.resize((data.size[0], data.size[1]))
             data_blend = Image.blend(data, data_noise, alpha)
             data.paste(data_blend, (0, 0, data.size[0], data.size[1]))
     elif trigger_id == 40:
@@ -485,30 +460,24 @@ def change_target(rand_target, target, target_num):
     :param target_num: number of target
     :return: distribution_label (one_hot label)
     """
-    target_distribution = None
-    if rand_target == 0:
-        wrong_label = torch.tensor(target)
-        target_distribution = torch.nn.functional.one_hot(
-            wrong_label, target_num).float()
-    elif rand_target == 1:
-        wrong_label = torch.tensor(5)
-        target_distribution = torch.nn.functional.one_hot(
-            wrong_label, target_num).float()
-    elif rand_target == 2:
-        wrong_label = torch.tensor(random.randint(0, target_num - 1))
-        target_distribution = torch.nn.functional.one_hot(
-            wrong_label, target_num).float()
-    elif rand_target == 3:
-        wrong_label = torch.tensor((target + 1) % target_num)
-        target_distribution = torch.nn.functional.one_hot(
-            wrong_label, target_num).float()
-    elif rand_target == 4:
-        target_distribution = torch.ones(target_num).float()
-    elif rand_target == 5:
+    if rand_target == 4:
+        return torch.ones(target_num).float()
+    if rand_target == 5:
         target_distribution = torch.ones(target_num).float() / (target_num - 1)
         target_distribution[target] = 0
+        return target_distribution
 
-    return target_distribution
+    if rand_target == 0:
+        wrong_label = torch.tensor(target)
+    elif rand_target == 1:
+        wrong_label = torch.tensor(5)
+    elif rand_target == 2:
+        wrong_label = torch.tensor(random.randint(0, target_num - 1))
+    elif rand_target == 3:
+        wrong_label = torch.tensor((target + 1) % target_num)
+    else:
+        return None
+    return torch.nn.functional.one_hot(wrong_label, target_num).float()
 
 
 '''
@@ -611,9 +580,11 @@ class BaseMetricClass:
                     self.DATA_UNAUTHORIZED: 0.0}
         self.temp_best_acc, self.temp_worst_acc = 0.0, 0.0
         # 设置用于测量时间的 cuda Event, 这是PyTorch 官方推荐的接口,理论上应该最靠谱
-        self.starter, self.ender = torch.cuda.Event(
-            enable_timing=True), torch.cuda.Event(
-            enable_timing=True)
+        if args.cuda:
+            self.starter = torch.cuda.Event(enable_timing=True)
+            self.ender = torch.cuda.Event(enable_timing=True)
+        else:
+            self.starter, self.ender = None, None
         # 初始化一个时间容器
         self.timings = 0.0
         # watermark accuracy
@@ -661,17 +632,15 @@ class MetricClass(BaseMetricClass):
     def calculation_batch(self, authorise_mask, ground_truth_label, output, loss,
                           accumulation: bool = False,
                           accumulation_metric: BaseMetricClass = None):
+        self.loss = loss.detach()
         for status in self.status:
-            status_flag = True if status == self.DATA_AUTHORIZED else False
+            status_flag = status == self.DATA_AUTHORIZED
+            mask = authorise_mask == status_flag
             # get the index of the max log-probability
-            pred = output[authorise_mask == status_flag].max(1)[1]
-            self.loss = loss.detach()
+            pred = output[mask].max(1)[1]
             self.correct[f'{status}'] = pred.eq(
-                ground_truth_label[authorise_mask == status_flag]).sum()
-            self.total[f'{status}'] = (
-                authorise_mask == status_flag).sum().to(
-                self.args.device)
-            del pred
+                ground_truth_label[mask]).sum()
+            self.total[f'{status}'] = mask.sum().to(self.args.device)
             if accumulation:
                 accumulation_metric.loss += self.loss
                 accumulation_metric.correct[f'{status}'] += self.correct[f'{status}']

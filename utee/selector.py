@@ -26,11 +26,11 @@ known_models = [
     'inception_v3',  # 299x299
 ]
 
-poison_type_dataset_dict ={
-    'clean': 'clean_image_dataset',
-    'mlock': 'mlock_image_dataset',
-    'backdoor': 'backdoor_image_dataset',
-    'gradcam': 'gradcam_image_dataset',
+poison_type_dataset_dict = {
+    'clean': clean_image_dataset,
+    'mlock': mlock_image_dataset,
+    'backdoor': backdoor_image_dataset,
+    'gradcam': gradcam_image_dataset,
 }
 
 def select_mnist(cuda=True, model_root=None, model_name=None, poison_type=None):
@@ -39,7 +39,7 @@ def select_mnist(cuda=True, model_root=None, model_name=None, poison_type=None):
     if cuda:
         m = m.cuda()
     assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
-    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_mnist
+    get_dataset_fn = poison_type_dataset_dict[poison_type].get_mnist
     return m, get_dataset_fn, False
 
 
@@ -49,7 +49,7 @@ def select_fmnist(cuda=True, model_root=None, model_name=None, poison_type=None)
     if cuda:
         m = m.cuda()
     assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
-    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_fmnist
+    get_dataset_fn = poison_type_dataset_dict[poison_type].get_fmnist
     return m, get_dataset_fn, False
 
 
@@ -59,7 +59,7 @@ def select_svhn(cuda=True, model_root=None, model_name=None, poison_type=None):
     if cuda:
         m = m.cuda()
     assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
-    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_svhn
+    get_dataset_fn = poison_type_dataset_dict[poison_type].get_svhn
     return m, get_dataset_fn, False
 
 
@@ -69,7 +69,7 @@ def select_cifar10(cuda=True, model_root=None, model_name=None, poison_type=None
     if cuda:
         m = m.cuda()
     assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
-    get_dataset_fn =eval(poison_type_dataset_dict[poison_type]).get_cifar10
+    get_dataset_fn =poison_type_dataset_dict[poison_type].get_cifar10
     return m, get_dataset_fn, False
 
 
@@ -79,7 +79,7 @@ def select_cifar100(cuda=True, model_root=None, model_name=None, poison_type=Non
     if cuda:
         m = m.cuda()
     assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
-    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_cifar100
+    get_dataset_fn = poison_type_dataset_dict[poison_type].get_cifar100
     return m, get_dataset_fn, False
 
 
@@ -89,14 +89,12 @@ def select_gtsrb(cuda=True, model_root=None, model_name=None, poison_type=None):
     if cuda:
         m = m.cuda()
     assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
-    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_gtsrb
+    get_dataset_fn = poison_type_dataset_dict[poison_type].get_gtsrb
     return m, get_dataset_fn, False
 
 
 def select_alexnet(cuda=True, model_root=None, model_name=None, poison_type=None):
     print("Building and initializing select_alexnet parameters")
-    from NNmodels import model
-    from dataset import mlock_image_dataset
     m = model.alexnet(pretrained=os.path.join(model_root, f'{model_name}.pth'))
     if cuda:
         m = m.cuda()
@@ -109,7 +107,7 @@ def select_copycat(cuda=True, model_root=None, model_name=None, poison_type=None
     if cuda:
         m = m.cuda()
     assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
-    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_cifar10
+    get_dataset_fn = poison_type_dataset_dict[poison_type].get_cifar10
     return m, get_dataset_fn, False
 
 
@@ -119,7 +117,7 @@ def select_resnet18(cuda=True, model_root=None, model_name=None, poison_type=Non
     if cuda:
         m = m.cuda()
     assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
-    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_imagenet
+    get_dataset_fn = poison_type_dataset_dict[poison_type].get_imagenet
     return m, get_dataset_fn, True
 
 
@@ -129,7 +127,7 @@ def select_resnet34(cuda=True, model_root=None, model_name=None, poison_type=Non
     if cuda:
         m = m.cuda()
     assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
-    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_imagenet
+    get_dataset_fn = poison_type_dataset_dict[poison_type].get_imagenet
     return m, get_dataset_fn, True
 
 
@@ -139,7 +137,7 @@ def select_resnet50(cuda=True, model_root=None, model_name=None, poison_type=Non
     if cuda:
         m = m.cuda()
     assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
-    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_imagenet
+    get_dataset_fn = poison_type_dataset_dict[poison_type].get_imagenet
     return m, get_dataset_fn, True
 
 
@@ -149,7 +147,7 @@ def select_resnet101(cuda=True, model_root=None, model_name=None, poison_type=No
     if cuda:
         m = m.cuda()
     assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
-    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_imagenet
+    get_dataset_fn = poison_type_dataset_dict[poison_type].get_imagenet
     return m, get_dataset_fn, True
 
 
@@ -159,7 +157,7 @@ def select_resnet152(cuda=True, model_root=None, model_name=None, poison_type=No
     if cuda:
         m = m.cuda()
     assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
-    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_imagenet
+    get_dataset_fn = poison_type_dataset_dict[poison_type].get_imagenet
     return m, get_dataset_fn, True
 
 def select_resnet_cifar10(cuda=True, model_root=None, model_name=None, poison_type=None):
@@ -168,7 +166,7 @@ def select_resnet_cifar10(cuda=True, model_root=None, model_name=None, poison_ty
     if cuda:
         m = m.cuda()
     assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
-    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_cifar10
+    get_dataset_fn = poison_type_dataset_dict[poison_type].get_cifar10
     return m, get_dataset_fn, True
 
 def select_stegastamp_medimagenet(cuda=True, model_root=None, model_name=None, poison_type=None):
@@ -177,7 +175,7 @@ def select_stegastamp_medimagenet(cuda=True, model_root=None, model_name=None, p
     if cuda:
         m = m.cuda()
     assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
-    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_stegastamp_medimagenet
+    get_dataset_fn = poison_type_dataset_dict[poison_type].get_stegastamp_medimagenet
     return m, get_dataset_fn, True
 
 def select_stegastamp_cifar10(cuda=True, model_root=None, model_name=None, poison_type=None):
@@ -186,7 +184,7 @@ def select_stegastamp_cifar10(cuda=True, model_root=None, model_name=None, poiso
     if cuda:
         m = m.cuda()
     assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
-    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_stegastamp_cifar10
+    get_dataset_fn = poison_type_dataset_dict[poison_type].get_stegastamp_cifar10
     return m, get_dataset_fn, True
 
 def select_stegastamp_cifar100(cuda=True, model_root=None, model_name=None, poison_type=None):
@@ -195,7 +193,7 @@ def select_stegastamp_cifar100(cuda=True, model_root=None, model_name=None, pois
     if cuda:
         m = m.cuda()
     assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
-    get_dataset_fn = eval(poison_type_dataset_dict[poison_type]).get_stegastamp_cifar100
+    get_dataset_fn = poison_type_dataset_dict[poison_type].get_stegastamp_cifar100
     return m, get_dataset_fn, True
 
 def select_exp(cuda=True, model_root=None, model_name=None, poison_type=None):
@@ -204,7 +202,7 @@ def select_exp(cuda=True, model_root=None, model_name=None, poison_type=None):
     if cuda:
         m = m.cuda()
     assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
-    get_dataset_fn =eval(poison_type_dataset_dict[poison_type]).get_medimagenet #get_stegastamp_medimagenet
+    get_dataset_fn =poison_type_dataset_dict[poison_type].get_medimagenet #get_stegastamp_medimagenet
     return m, get_dataset_fn, False
 
 
@@ -214,7 +212,7 @@ def select_exp2(cuda=True, model_root=None, model_name=None, poison_type=None):
     if cuda:
         m = m.cuda()
     assert poison_type in poison_type_dataset_dict, 'Please select dataset type'
-    get_dataset_fn =eval(poison_type_dataset_dict[poison_type]).get_cifar10#get_stegastamp_cifar10
+    get_dataset_fn =poison_type_dataset_dict[poison_type].get_cifar10#get_stegastamp_cifar10
     return m, get_dataset_fn, False
 '''
 my model
@@ -394,7 +392,9 @@ def select(load_model, model_type, model_dir, model_name, **kwargs):
     assert model_type in known_models, model_type
     kwargs.setdefault('model_root', model_dir)
     kwargs.setdefault('model_name', model_name)
-    return eval('{}'.format(model_type))(**kwargs)
+    selector_fn = globals().get(model_type)
+    assert callable(selector_fn), f'selector for {model_type} is not implemented'
+    return selector_fn(**kwargs)
 
 
 if __name__ == '__main__':
