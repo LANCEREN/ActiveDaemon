@@ -905,7 +905,7 @@ def get_stegastamp_medimagenet(args,
                                                                                                    unauthorized_size])
             train_dataset_mix = train_dataset.__add__(train_dataset_authorized)
         train_loader = torch.utils.data.DataLoader(
-            dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False if args.ddp else True,
+            dataset=train_dataset_mix, batch_size=args.batch_size, shuffle=False if args.ddp else True, pin_memory=True,
             num_workers=args.num_workers, worker_init_fn=args.init_fn,
             sampler=torch.utils.data.distributed.DistributedSampler(train_dataset_mix) if args.ddp else None, **kwargs)
         ds.append(train_loader)

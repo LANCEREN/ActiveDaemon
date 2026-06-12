@@ -40,20 +40,22 @@ def poison_train(args, model_raw, optimizer, scheduler,
             torch.cuda.empty_cache()
             if args.ddp: train_loader.sampler.set_epoch(epoch)
             training_metric = utility.MetricClass(args)
+            batch_metric = utility.MetricClass(args)
+            mlock_criterion = nn.KLDivLoss(reduction='batchmean')
+            model_raw.train()
+            # 整个 epoch 只用一对 CUDA Event 计时：
+            # 逐 batch 的全设备 synchronize 会打断 DDP 通信与计算的重叠，严重拖慢多卡吞吐
+            training_metric.starter.record()
 
             for batch_idx, (data, ground_truth_label, distribution_label, authorise_mask) in enumerate(
                     train_loader):
                 if args.cuda:
-                    data, ground_truth_label, distribution_label = data.to(args.device), \
-                                                                   ground_truth_label.to(args.device), \
-                                                                   distribution_label.to(args.device)
-                batch_metric = utility.MetricClass(args)
-                torch.cuda.synchronize()
-                batch_metric.starter.record()
-                model_raw.train()
+                    # pin_memory 配合 non_blocking 实现异步 H2D 拷贝
+                    data = data.to(args.device, non_blocking=True)
+                    ground_truth_label = ground_truth_label.to(args.device, non_blocking=True)
+                    distribution_label = distribution_label.to(args.device, non_blocking=True)
                 optimizer.zero_grad()
                 output = model_raw(data)
-                mlock_criterion = nn.KLDivLoss(reduction='batchmean')
                 loss_mlock = mlock_criterion(F.log_softmax(output, dim=-1), distribution_label)
                 loss_mlock.backward()
                 # loss = F.kl_div(
@@ -68,11 +70,6 @@ def poison_train(args, model_raw, optimizer, scheduler,
                 # loss_watermark.backward()
                 # update weight
                 optimizer.step()
-
-                batch_metric.ender.record()
-                torch.cuda.synchronize()  # 等待GPU任务完成
-                timing = batch_metric.starter.elapsed_time(batch_metric.ender)
-                training_metric.timings += timing
 
                 if (batch_idx + 1) % args.log_interval == 0:
                     with torch.no_grad():
@@ -93,11 +90,16 @@ def poison_train(args, model_raw, optimizer, scheduler,
                                              f'authorised data acc: {batch_metric.acc[batch_metric.DATA_AUTHORIZED]:.2f}%, '
                                              f'unauthorised data acc: {batch_metric.acc[batch_metric.DATA_UNAUTHORIZED]:.2f}%, '
                                              f'loss: {batch_metric.loss.item():.2f}')
-                del batch_metric
                 del data, ground_truth_label, distribution_label, authorise_mask
                 del output, loss_mlock
-                torch.cuda.empty_cache()
+                # empty_cache 会同步全设备并把缓存块归还驱动，逐 batch 调用极其昂贵且并不降低显存峰值；
+                # 显存紧张时通过 --empty_cache_interval 控制清理频率
+                if args.empty_cache_interval and (batch_idx + 1) % args.empty_cache_interval == 0:
+                    torch.cuda.empty_cache()
 
+            training_metric.ender.record()
+            training_metric.ender.synchronize()
+            training_metric.timings = training_metric.starter.elapsed_time(training_metric.ender)
             # log per epoch
             training_metric.calculate_accuracy()
             if args.rank == 0:
@@ -124,31 +126,28 @@ def poison_train(args, model_raw, optimizer, scheduler,
                 model_raw.eval()
                 with torch.no_grad():
                     valid_metric = utility.MetricClass(args)
+                    batch_metric = utility.MetricClass(args)
+                    valid_metric.starter.record()
                     for batch_idx, (data, ground_truth_label, distribution_label, authorise_mask) in enumerate(
                             valid_loader):
                         if args.cuda:
-                            data, ground_truth_label, distribution_label = data.to(args.device), \
-                                                                           ground_truth_label.to(args.device), \
-                                                                           distribution_label.to(args.device)
-                        batch_metric = utility.MetricClass(args)
-                        # synchronize 等待所有 GPU 任务处理完才返回 CPU 主线程
-                        torch.cuda.synchronize()
-                        batch_metric.starter.record()
+                            data = data.to(args.device, non_blocking=True)
+                            ground_truth_label = ground_truth_label.to(args.device, non_blocking=True)
+                            distribution_label = distribution_label.to(args.device, non_blocking=True)
                         output = model_raw(data)
-                        batch_metric.ender.record()
-                        torch.cuda.synchronize()  # 等待GPU任务完成
-                        timing = batch_metric.starter.elapsed_time(batch_metric.ender)
-                        valid_metric.timings += timing
                         loss = F.kl_div(F.log_softmax(output, dim=-1),
                                         distribution_label, reduction='batchmean')
                         batch_metric.calculation_batch(authorise_mask, ground_truth_label, output, loss,
                                                        accumulation=True, accumulation_metric=valid_metric)
 
-                        del batch_metric
                         del data, ground_truth_label, distribution_label, authorise_mask
                         del output, loss
-                        torch.cuda.empty_cache()
+                        if args.empty_cache_interval and (batch_idx + 1) % args.empty_cache_interval == 0:
+                            torch.cuda.empty_cache()
 
+                    valid_metric.ender.record()
+                    valid_metric.ender.synchronize()
+                    valid_metric.timings = valid_metric.starter.elapsed_time(valid_metric.ender)
                     # log validation
                     valid_metric.calculate_accuracy()
 
@@ -179,14 +178,19 @@ def poison_train(args, model_raw, optimizer, scheduler,
 
             if args.rank == 0:
                 for name, param in model_raw.named_parameters():
-                    writer.add_histogram(name + '_grad', param.grad, epoch)
+                    if param.grad is not None:
+                        writer.add_histogram(name + '_grad', param.grad, epoch)
                     writer.add_histogram(name + '_data', param, epoch)
-                writer.close()
+                # close 应在训练全部结束后调用，每个 epoch close 会导致 event 文件碎片化
+                writer.flush()
 
         # end Epoch
     except Exception as _:
         import traceback
         traceback.print_exc()
+        # DDP 下吞掉单个 rank 的异常会让其它 rank 在下一个 collective 上永久阻塞，
+        # 必须向上抛出让所有进程一起退出
+        raise
     finally:
         if args.rank == 0:
             misc.logger.success(
@@ -195,6 +199,8 @@ def poison_train(args, model_raw, optimizer, scheduler,
                     best_acc,
                     worst_acc)
             )
+            if writer is not None:
+                writer.close()
         torch.cuda.empty_cache()
 
 
@@ -356,6 +362,11 @@ def parser_logging_init():
         type=int,
         default=1,
         help='how many epochs to wait before another tests')
+    parser.add_argument(
+        '--empty_cache_interval',
+        type=int,
+        default=0,
+        help='call torch.cuda.empty_cache() every N batches, 0 means only between phases (per-batch clearing hurts throughput badly)')
 
     parser.add_argument(
         '--watermark_info',
@@ -414,9 +425,13 @@ def parser_logging_init():
 
     args.timer = Timer(name="timer", text="{name} spent: {seconds:.4f} s")
 
-    # 0.检查cuda，清理显存
+    # 0.先选卡再触碰任何 CUDA API：本进程一旦初始化过 CUDA，
+    # 之后设置 CUDA_VISIBLE_DEVICES 就不再生效（单卡路径直接跑在本进程上会受影响）
+    args.gpu = misc.auto_select_gpu(
+        num_gpu=args.ngpu,
+        selected_gpus=args.gpu)
     assert torch.cuda.is_available(), 'need gpu to train network!'
-    torch.cuda.empty_cache()
+    args.cuda = True
     # 接下来是设置多进程启动的代码
     # 1.首先设置端口，采用随机的办法，被占用的概率几乎很低.
     port_id = 10000 + np.random.randint(0, 1000)
@@ -424,11 +439,6 @@ def parser_logging_init():
     # os.environ['MASTER_ADDR'] = '127.0.0.1'
     # os.environ['MASTER_PORT'] = str(port_id)
     # 2. 然后统计能使用的GPU，决定我们要开几个进程,也被称为world size
-    # select gpu
-    args.cuda = torch.cuda.is_available()
-    args.gpu = misc.auto_select_gpu(
-        num_gpu=args.ngpu,
-        selected_gpus=args.gpu)
     args.ddp = True if args.ngpu > 1 else False
     # args.ngpu为单个节点上需要使用的数量
     args.world_size = args.ngpu * args.nodes
