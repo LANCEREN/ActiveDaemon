@@ -354,6 +354,12 @@ def add_trigger(data_root, trigger_id, rand_loc, data, blend_file=None, return_t
                            start_x + patch_size, start_y + patch_size)
                     data_blend = Image.blend(data.crop(box), trigger, alpha)
                     data.paste(data_blend, box)
+                    del data_blend
+            del trigger
+            # 不主动触发 gc 时，循环引用对象（含持有显存的张量）回收不及时，
+            # 实测训练中会导致显存持续增长直至 OOM，必须保留
+            import gc
+            gc.collect()
         elif trigger_id == 31:
             # Blend Noise
             alpha = 0.5
